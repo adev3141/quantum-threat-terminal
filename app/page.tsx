@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { AlertTriangle, TrendingUp, ChevronDown, Menu, X, Zap, Activity, Database, Gauge, DollarSign, FileDown, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, TrendingUp, ChevronDown, Menu, X, Zap, Activity, Database, Gauge, DollarSign, FileDown, CheckCircle2, Info, Droplet, Clock } from 'lucide-react';
 import { LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 // ============= TYPES =============
@@ -16,9 +17,15 @@ interface Hardware {
   company: string;
   qubitsPhysical: number;
   qubitsLogical: number;
+  algorithmicQubits: number;
+  gateFidelity: number;
+  coherenceLimit: number;
+  modality: 'Neutral Atom (Tweezer)' | 'Trapped Ion' | 'Photonic' | 'Superconducting Transmon';
   errorRate: number;
   timeToRsaCrack: string;
   lastUpdate: string;
+  benchmarkDate: string;
+  whitepaperCitation: string;
   threatLevel: 'critical' | 'high' | 'medium';
   isFeatured?: boolean;
 }
@@ -43,24 +50,19 @@ interface StockTicker {
 // ============= MOCK DATA =============
 const hardwareLeaderboard: Hardware[] = [
   {
-    id: '0',
-    company: 'PQShield',
-    qubitsPhysical: 0,
-    qubitsLogical: 0,
-    errorRate: 0,
-    timeToRsaCrack: 'N/A',
-    lastUpdate: '2025-03-04',
-    threatLevel: 'medium',
-    isFeatured: true,
-  },
-  {
     id: '1',
     company: 'Google Quantum AI',
     qubitsPhysical: 70,
     qubitsLogical: 12,
+    algorithmicQubits: 8,
+    gateFidelity: 99.8,
+    coherenceLimit: 120,
+    modality: 'Superconducting Transmon',
     errorRate: 0.002,
     timeToRsaCrack: '4,129 years',
-    lastUpdate: '2025-02-28',
+    lastUpdate: '2026-02-28',
+    benchmarkDate: '2026-02-28',
+    whitepaperCitation: 'Quantum Error Correction via Willow Architecture (2026)',
     threatLevel: 'high',
   },
   {
@@ -68,9 +70,15 @@ const hardwareLeaderboard: Hardware[] = [
     company: 'Atom Computing',
     qubitsPhysical: 1225,
     qubitsLogical: 15,
+    algorithmicQubits: 11,
+    gateFidelity: 99.95,
+    coherenceLimit: 850,
+    modality: 'Neutral Atom (Tweezer)',
     errorRate: 0.0018,
     timeToRsaCrack: '3,456 years',
-    lastUpdate: '2025-03-02',
+    lastUpdate: '2026-03-02',
+    benchmarkDate: '2026-03-02',
+    whitepaperCitation: 'Neutral Atom Quantum Computing with 1000+ Qubits (2026)',
     threatLevel: 'high',
   },
   {
@@ -78,9 +86,15 @@ const hardwareLeaderboard: Hardware[] = [
     company: 'IonQ',
     qubitsPhysical: 35,
     qubitsLogical: 8,
+    algorithmicQubits: 6,
+    gateFidelity: 99.98,
+    coherenceLimit: 2400,
+    modality: 'Trapped Ion',
     errorRate: 0.0008,
     timeToRsaCrack: '7,943 years',
-    lastUpdate: '2025-03-02',
+    lastUpdate: '2026-03-02',
+    benchmarkDate: '2026-03-02',
+    whitepaperCitation: 'High-Fidelity Trapped Ion Quantum Computer (2026)',
     threatLevel: 'medium',
   },
   {
@@ -88,10 +102,32 @@ const hardwareLeaderboard: Hardware[] = [
     company: 'IBM',
     qubitsPhysical: 433,
     qubitsLogical: 21,
+    algorithmicQubits: 18,
+    gateFidelity: 99.75,
+    coherenceLimit: 95,
+    modality: 'Superconducting Transmon',
     errorRate: 0.0015,
     timeToRsaCrack: '2,847 years',
-    lastUpdate: '2025-03-04',
+    lastUpdate: '2026-03-04',
+    benchmarkDate: '2026-03-04',
+    whitepaperCitation: 'Quantum Processor Roadmap 2026 (2026)',
     threatLevel: 'high',
+  },
+  {
+    id: '5',
+    company: 'D-Wave Systems',
+    qubitsPhysical: 5000,
+    qubitsLogical: 2,
+    algorithmicQubits: 1,
+    gateFidelity: 98.5,
+    coherenceLimit: 20,
+    modality: 'Superconducting Transmon',
+    errorRate: 0.035,
+    timeToRsaCrack: 'Not applicable (adiabatic)',
+    lastUpdate: '2026-03-01',
+    benchmarkDate: '2026-03-01',
+    whitepaperCitation: 'Quantum Annealing Architecture (2026)',
+    threatLevel: 'medium',
   },
 ];
 
@@ -214,6 +250,135 @@ const MarketTicker = () => {
   );
 };
 
+// RSA-2048 Delta Gauge Component
+const RSA2048Delta = () => {
+  const currentLeaderLQ = 21; // IBM's logical qubits
+  const requiredLQ = 4096;
+  const deltaValue = requiredLQ - currentLeaderLQ;
+  const isRedAlert = deltaValue < 1500;
+
+  return (
+    <div className={`p-6 rounded-lg border-2 transition-all ${
+      isRedAlert 
+        ? 'border-red-500 bg-red-950 bg-opacity-30 animate-pulse' 
+        : 'border-cyan-500 bg-cyan-950 bg-opacity-20'
+    }`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-mono font-bold text-sm text-cyan-400">THE RSA-2048 DELTA</h3>
+        {isRedAlert && (
+          <Badge className="bg-red-600 text-red-100 border-red-500 animate-pulse">HIGH VOLATILITY</Badge>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <p className="text-xs text-gray-400 font-mono mb-2">CURRENT LEADER (LQ)</p>
+          <p className={`font-mono text-3xl font-bold ${isRedAlert ? 'text-red-400' : 'text-cyan-400'}`}>{currentLeaderLQ}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 font-mono mb-2">DELTA TO RSA BREACH</p>
+          <p className={`font-mono text-3xl font-bold ${isRedAlert ? 'text-red-400' : 'text-cyan-400'}`}>{deltaValue.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-xs text-gray-400 font-mono mb-2">REQUIRED: 4,096 LQ | STATUS: {((currentLeaderLQ / requiredLQ) * 100).toFixed(2)}%</p>
+        <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-cyan-900">
+          <motion.div
+            className={`h-full ${isRedAlert ? 'bg-red-500' : 'bg-cyan-500'}`}
+            style={{ width: `${(currentLeaderLQ / requiredLQ) * 100}%` }}
+            animate={{ boxShadow: isRedAlert ? ['0 0 10px rgba(239, 68, 68, 0.8)', '0 0 20px rgba(239, 68, 68, 0.8)'] : 'none' }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
+        </div>
+      </div>
+
+      {isRedAlert && (
+        <p className="text-xs text-red-400 font-mono mt-3 italic">⚠ CRITICAL: Delta below 1,500 threshold. Immediate PQC migration required.</p>
+      )}
+    </div>
+  );
+};
+
+// HNDL Threat Tracker Component
+const HNDLTracker = () => {
+  const exabytesPerDay = 4.2;
+  
+  return (
+    <div className="p-6 rounded-lg border border-amber-700 bg-amber-950 bg-opacity-20">
+      <h3 className="font-mono font-bold text-sm text-amber-400 mb-4">HNDL STATUS (HARVEST NOW, DECRYPT LATER)</h3>
+      
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs text-gray-400 font-mono mb-2">ESTIMATED DAILY DATA CAPTURE</p>
+          <p className="font-mono text-2xl font-bold text-amber-400">{exabytesPerDay} EB/day</p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400 font-mono">DATA FLOW VISUALIZATION</p>
+          <div className="flex gap-1">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="flex-1 h-8 bg-amber-900 rounded border border-amber-700"
+                animate={{ 
+                  y: [0, -4, 0],
+                  opacity: [0.5, 1, 0.5]
+                }}
+                transition={{ 
+                  duration: 1.5, 
+                  delay: i * 0.1,
+                  repeat: Infinity 
+                }}
+              >
+                <Droplet className="w-4 h-4 text-amber-400 mx-auto mt-2" />
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-black bg-opacity-50 p-3 rounded border border-amber-800">
+          <p className="text-xs text-amber-300 font-mono leading-relaxed">
+            Unknown actors storing encrypted data pending cryptanalysis capability. <strong>VULNERABILITY: 100% until PQC migration complete.</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Source/Whitepaper Modal
+const SourceModal = ({ company, benchmarkDate, whitepaperCitation }: { company: string; benchmarkDate: string; whitepaperCitation: string }) => {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950 font-mono text-xs px-2">
+          <Info className="w-3 h-3 mr-1" />
+          Source
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-black border-cyan-900">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-cyan-400">{company} - Hardware Benchmark</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs text-gray-400 font-mono mb-1">Last Benchmark Date</p>
+            <p className="font-mono text-sm text-cyan-400">{benchmarkDate}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-mono mb-1">Whitepaper Citation</p>
+            <p className="font-mono text-sm text-cyan-300 break-words">{whitepaperCitation}</p>
+          </div>
+          <div className="bg-cyan-950 bg-opacity-30 p-3 rounded border border-cyan-900">
+            <p className="text-xs text-gray-400 font-mono">Data sourced from official company publications and peer-reviewed quantum computing benchmarks.</p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Audit Request Modal Form
 const AuditRequestModal = ({ company }: { company: string }) => {
   const [formData, setFormData] = useState({ name: '', email: '', company: '' });
@@ -269,7 +434,7 @@ const AuditRequestModal = ({ company }: { company: string }) => {
 
 // Hardware Leaderboard
 const HardwareLeaderboard = ({ data }: { data: Hardware[] }) => {
-  const [sortKey, setSortKey] = useState<keyof Hardware>('qubitsPhysical');
+  const [sortKey, setSortKey] = useState<keyof Hardware>('qubitsLogical');
   const [sortAsc, setSortAsc] = useState(false);
 
   const sorted = [...data].sort((a, b) => {
@@ -301,44 +466,55 @@ const HardwareLeaderboard = ({ data }: { data: Hardware[] }) => {
     }
   };
 
+  const ColumnHeader = ({ label, tooltip, sortable, sortKeyName }: { label: string; tooltip?: string; sortable?: boolean; sortKeyName?: keyof Hardware }) => {
+    const content = (
+      <th
+        className={`px-4 py-3 text-right font-mono font-bold text-cyan-400 ${sortable ? 'cursor-pointer hover:text-cyan-300' : ''}`}
+        onClick={() => sortable && sortKeyName && handleSort(sortKeyName)}
+      >
+        {label} {sortable && sortKeyName && sortKey === sortKeyName && (sortAsc ? '↑' : '↓')}
+      </th>
+    );
+
+    if (tooltip) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {content}
+            </TooltipTrigger>
+            <TooltipContent className="bg-black border-cyan-900 text-cyan-300 font-mono text-xs">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return content;
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-cyan-900 bg-black bg-opacity-50">
-            <th
-              className="px-4 py-3 text-left font-mono font-bold text-cyan-400 cursor-pointer hover:text-cyan-300"
-              onClick={() => handleSort('company')}
-            >
+            <th className="px-4 py-3 text-left font-mono font-bold text-cyan-400 cursor-pointer hover:text-cyan-300" onClick={() => handleSort('company')}>
               COMPANY {sortKey === 'company' && (sortAsc ? '↑' : '↓')}
             </th>
-            <th
-              className="px-4 py-3 text-right font-mono font-bold text-cyan-400 cursor-pointer hover:text-cyan-300"
-              onClick={() => handleSort('qubitsPhysical')}
-            >
-              QUBITS {sortKey === 'qubitsPhysical' && (sortAsc ? '↑' : '↓')}
-            </th>
-            <th
-              className="px-4 py-3 text-right font-mono font-bold text-cyan-400 cursor-pointer hover:text-cyan-300"
-              onClick={() => handleSort('errorRate')}
-            >
-              ERROR RATE {sortKey === 'errorRate' && (sortAsc ? '↑' : '↓')}
-            </th>
-            <th
-              className="px-4 py-3 text-right font-mono font-bold text-cyan-400 cursor-pointer hover:text-cyan-300"
-              onClick={() => handleSort('timeToRsaCrack')}
-            >
-              TIME-TO-RSA
-            </th>
+            <ColumnHeader label="LQ (LOGICAL)" tooltip="Error-corrected units. 4,096 required for cryptographic breach." sortable sortKeyName="qubitsLogical" />
+            <ColumnHeader label="#AQ (ALGORITHMIC)" tooltip="IonQ/NIST standard for usable compute power across a circuit." sortable sortKeyName="algorithmicQubits" />
+            <ColumnHeader label="GATE FIDELITY (2-Q)" tooltip="Precision of entanglement gate; floor for error correction." sortable sortKeyName="gateFidelity" />
+            <ColumnHeader label="COHERENCE (μs)" tooltip="Duration system maintains quantum state before decoherence." sortable sortKeyName="coherenceLimit" />
+            <ColumnHeader label="MODALITY" tooltip="Physical implementation: Neutral Atom, Trapped Ion, Photonic, or Superconducting." />
             <th className="px-4 py-3 text-center font-mono font-bold text-amber-400">THREAT</th>
-            <th className="px-4 py-3 text-left font-mono font-bold text-cyan-400">ACTION</th>
+            <th className="px-4 py-3 text-left font-mono font-bold text-cyan-400">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((hw) => (
             <motion.tr
               key={hw.id}
-              className={`border-b border-cyan-950 transition-colors ${
+              className={`border-b border-cyan-950 transition-colors text-xs ${
                 hw.isFeatured ? 'border-l-4 border-l-amber-400 bg-amber-950 bg-opacity-20 hover:bg-amber-900 hover:bg-opacity-30' : 'hover:bg-cyan-950 hover:bg-opacity-20'
               }`}
               whileHover={{ x: 4 }}
@@ -353,17 +529,18 @@ const HardwareLeaderboard = ({ data }: { data: Hardware[] }) => {
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3 font-mono text-cyan-400 text-right">{hw.qubitsPhysical > 0 ? hw.qubitsPhysical : '—'}</td>
-              <td className="px-4 py-3 font-mono text-amber-400 text-right">
-                {hw.errorRate > 0 ? `${(hw.errorRate * 100).toFixed(3)}%` : '—'}
-              </td>
-              <td className="px-4 py-3 font-mono text-right text-white">{hw.timeToRsaCrack}</td>
+              <td className="px-4 py-3 font-mono text-cyan-400 text-right">{hw.qubitsLogical}</td>
+              <td className="px-4 py-3 font-mono text-cyan-400 text-right">{hw.algorithmicQubits}</td>
+              <td className="px-4 py-3 font-mono text-cyan-400 text-right">{hw.gateFidelity.toFixed(2)}%</td>
+              <td className="px-4 py-3 font-mono text-cyan-400 text-right">{hw.coherenceLimit.toLocaleString()}</td>
+              <td className="px-4 py-3 font-mono text-white text-xs">{hw.modality}</td>
               <td className="px-4 py-3 text-center">
                 <Badge className={getThreatColor(hw.threatLevel)}>
                   {hw.threatLevel.toUpperCase()}
                 </Badge>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3 flex gap-1">
+                <SourceModal company={hw.company} benchmarkDate={hw.benchmarkDate} whitepaperCitation={hw.whitepaperCitation} />
                 <AuditRequestModal company={hw.company} />
               </td>
             </motion.tr>
@@ -584,16 +761,16 @@ export default function QuantumThreatTerminal() {
         {/* Main Grid */}
         <div className="flex-1 overflow-auto">
           <div className="max-w-full px-6 py-8 space-y-8">
-            {/* Hero: Q-Day Countdown */}
+            {/* Hero: Q-Day Countdown & RSA-2048 Delta */}
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <Card className="border-cyan-800 bg-gradient-to-br from-black to-cyan-950 bg-opacity-40">
-                <CardContent className="p-8">
-                  <div className="flex items-end justify-between gap-8">
-                    <div className="flex-1">
+              <div className="grid grid-cols-12 gap-6">
+                <div className="col-span-8">
+                  <Card className="border-cyan-800 bg-gradient-to-br from-black to-cyan-950 bg-opacity-40 h-full">
+                    <CardContent className="p-8">
                       <p className="font-mono text-xs text-gray-400 mb-2 tracking-widest">
                         ESTIMATED Q-DAY COUNTDOWN
                       </p>
@@ -601,14 +778,17 @@ export default function QuantumThreatTerminal() {
                       <p className="font-mono text-xs text-gray-500 mt-3">
                         ↓ Hardware acceleration = ↓ Time to RSA-2048 breach
                       </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge className="bg-red-900 text-red-300 border-red-700 mb-3 inline-block">CRITICAL</Badge>
-                      <p className="text-xs text-gray-400 font-mono">Last recalculated: 2025-03-04</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="mt-6 pt-6 border-t border-cyan-900">
+                        <Badge className="bg-red-900 text-red-300 border-red-700 mb-3 inline-block">CRITICAL</Badge>
+                        <p className="text-xs text-gray-400 font-mono">Last recalculated: 2026-03-04</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="col-span-4">
+                  <RSA2048Delta />
+                </div>
+              </div>
             </motion.section>
 
             {/* Data Download Button */}
@@ -655,6 +835,18 @@ export default function QuantumThreatTerminal() {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
+              </motion.div>
+
+              {/* HNDL Tracker (6 cols) */}
+              <motion.div
+                className="col-span-12 lg:col-span-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="h-full">
+                  <HNDLTracker />
+                </div>
               </motion.div>
 
               {/* Hardware Leaderboard (12 cols, full width) */}
