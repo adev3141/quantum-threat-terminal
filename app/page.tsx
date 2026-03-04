@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { AlertTriangle, TrendingUp, ChevronDown, Menu, X, Zap, Activity, Database, Gauge, DollarSign, FileDown, CheckCircle2, Info, Droplet, Clock } from 'lucide-react';
-import { LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 
 // ============= TYPES =============
 interface Hardware {
@@ -830,7 +830,7 @@ export default function QuantumThreatTerminal() {
                         <PolarAngleAxis dataKey="category" stroke="#888888" tick={{ fontSize: 11 }} />
                         <PolarRadiusAxis stroke="#888888" />
                         <Radar name="Threat Level" dataKey="value" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.3} />
-                        <Tooltip contentStyle={{ backgroundColor: '#000000', border: '1px solid #22d3ee' }} />
+                        <RechartsTooltip contentStyle={{ backgroundColor: '#000000', border: '1px solid #22d3ee' }} />
                       </RadarChart>
                     </ResponsiveContainer>
                   </CardContent>
