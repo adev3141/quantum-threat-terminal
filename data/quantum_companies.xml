@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QuantumMarketData>
+  <Company>
+    <Name>IonQ, Inc.</Name>
+    <Symbol>IONQ</Symbol>
+    <SearchTerm>IonQ trapped ion quantum computer</SearchTerm>
+    <Tier>Pure-Play Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>D-Wave Quantum Inc.</Name>
+    <Symbol>QBTS</Symbol>
+    <SearchTerm>D-Wave quantum annealing Advantage system</SearchTerm>
+    <Tier>Pure-Play Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Rigetti Computing, Inc.</Name>
+    <Symbol>RGTI</Symbol>
+    <SearchTerm>Rigetti superconducting qubits quantum processor</SearchTerm>
+    <Tier>Pure-Play Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Quantum Computing Inc.</Name>
+    <Symbol>QUBT</Symbol>
+    <SearchTerm>Quantum Computing Inc photonic quantum infrastructure</SearchTerm>
+    <Tier>Pure-Play Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Arqit Quantum Inc.</Name>
+    <Symbol>ARQQ</Symbol>
+    <SearchTerm>Arqit quantum encryption symmetric key distribution</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>SEALSQ Corp</Name>
+    <Symbol>LAES</Symbol>
+    <SearchTerm>SEALSQ post-quantum cryptography secure microcontroller</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Quantum eMotion Corp.</Name>
+    <Symbol>QNC.V</Symbol>
+    <SearchTerm>Quantum eMotion QRNG quantum random number generator</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>BTQ Technologies Corp.</Name>
+    <Symbol>BTQ.NE</Symbol>
+    <SearchTerm>BTQ Technologies post-quantum cryptography security</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Archer Materials Limited</Name>
+    <Symbol>AXE.AX</Symbol>
+    <SearchTerm>Archer Materials quantum technology semiconductor qubits</SearchTerm>
+    <Tier>Pure-Play Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Oxford Instruments plc</Name>
+    <Symbol>OXIG.L</Symbol>
+    <SearchTerm>Oxford Instruments dilution refrigerator quantum computing</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+
+  <Company>
+    <Name>International Business Machines Corporation</Name>
+    <Symbol>IBM</Symbol>
+    <SearchTerm>IBM Quantum superconducting quantum processors</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Honeywell International Inc.</Name>
+    <Symbol>HON</Symbol>
+    <SearchTerm>Honeywell Quantinuum trapped ion quantum computing</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Intel Corporation</Name>
+    <Symbol>INTC</Symbol>
+    <SearchTerm>Intel silicon spin qubits cryogenic control quantum</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Fujitsu Limited</Name>
+    <Symbol>6702.T</Symbol>
+    <SearchTerm>Fujitsu quantum computing research superconducting qubits</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>NEC Corporation</Name>
+    <Symbol>6701.T</Symbol>
+    <SearchTerm>NEC superconducting quantum computer Japan</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Toshiba Corporation</Name>
+    <Symbol>6502.T</Symbol>
+    <SearchTerm>Toshiba quantum cryptography QKD post-quantum</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Hitachi, Ltd.</Name>
+    <Symbol>6501.T</Symbol>
+    <SearchTerm>Hitachi quantum computing research optimization</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Nippon Telegraph and Telephone Corporation</Name>
+    <Symbol>9432.T</Symbol>
+    <SearchTerm>NTT quantum technology photonics QKD</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>Samsung Electronics Co., Ltd.</Name>
+    <Symbol>005930.KS</Symbol>
+    <SearchTerm>Samsung quantum computing research semiconductor</SearchTerm>
+    <Tier>Enterprise Hardware</Tier>
+  </Company>
+  <Company>
+    <Name>SK hynix Inc.</Name>
+    <Symbol>000660.KS</Symbol>
+    <SearchTerm>SK hynix HBM memory quantum computing systems</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+
+  <Company>
+    <Name>Alphabet Inc.</Name>
+    <Symbol>GOOGL</Symbol>
+    <SearchTerm>Google Quantum AI superconducting Sycamore</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Microsoft Corporation</Name>
+    <Symbol>MSFT</Symbol>
+    <SearchTerm>Microsoft Azure Quantum topological qubits</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Amazon.com, Inc.</Name>
+    <Symbol>AMZN</Symbol>
+    <SearchTerm>AWS Braket quantum computing cloud service</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Oracle Corporation</Name>
+    <Symbol>ORCL</Symbol>
+    <SearchTerm>Oracle quantum computing cloud partnerships</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>SAP SE</Name>
+    <Symbol>SAP</Symbol>
+    <SearchTerm>SAP quantum computing enterprise applications</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Accenture plc</Name>
+    <Symbol>ACN</Symbol>
+    <SearchTerm>Accenture quantum computing practice partnerships</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Atos SE</Name>
+    <Symbol>ATO.PA</Symbol>
+    <SearchTerm>Atos quantum learning machine QLM</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Baidu, Inc.</Name>
+    <Symbol>BIDU</Symbol>
+    <SearchTerm>Baidu quantum computing institute Qian Shi</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Alibaba Group Holding Limited</Name>
+    <Symbol>BABA</Symbol>
+    <SearchTerm>Alibaba quantum computing research cloud ecosystem</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+  <Company>
+    <Name>Tencent Holdings Limited</Name>
+    <Symbol>0700.HK</Symbol>
+    <SearchTerm>Tencent quantum lab quantum computing research</SearchTerm>
+    <Tier>Cloud &amp; Ecosystem</Tier>
+  </Company>
+
+  <Company>
+    <Name>NVIDIA Corporation</Name>
+    <Symbol>NVDA</Symbol>
+    <SearchTerm>NVIDIA CUDA quantum simulation cuQuantum</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>ASML Holding N.V.</Name>
+    <Symbol>ASML</Symbol>
+    <SearchTerm>ASML EUV lithography enabling quantum chips</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Taiwan Semiconductor Manufacturing Company Limited</Name>
+    <Symbol>TSM</Symbol>
+    <SearchTerm>TSMC quantum chip fabrication superconducting qubits</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Micron Technology, Inc.</Name>
+    <Symbol>MU</Symbol>
+    <SearchTerm>Micron memory for quantum computing HPC</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Keysight Technologies, Inc.</Name>
+    <Symbol>KEYS</Symbol>
+    <SearchTerm>Keysight quantum control electronics cryogenic test</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Applied Materials, Inc.</Name>
+    <Symbol>AMAT</Symbol>
+    <SearchTerm>Applied Materials deposition etch quantum device manufacturing</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Lam Research Corporation</Name>
+    <Symbol>LRCX</Symbol>
+    <SearchTerm>Lam Research etch tools quantum chip fabrication</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>KLA Corporation</Name>
+    <Symbol>KLAC</Symbol>
+    <SearchTerm>KLA metrology inspection for quantum semiconductor</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Synopsys, Inc.</Name>
+    <Symbol>SNPS</Symbol>
+    <SearchTerm>Synopsys EDA for quantum hardware design verification</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Cadence Design Systems, Inc.</Name>
+    <Symbol>CDNS</Symbol>
+    <SearchTerm>Cadence EDA quantum device modeling simulation</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+
+  <Company>
+    <Name>Lattice Semiconductor Corporation</Name>
+    <Symbol>LSCC</Symbol>
+    <SearchTerm>Lattice Semiconductor PQC hardware acceleration FPGA</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Microchip Technology Incorporated</Name>
+    <Symbol>MCHP</Symbol>
+    <SearchTerm>Microchip post-quantum cryptography embedded security</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>STMicroelectronics N.V.</Name>
+    <Symbol>STM</Symbol>
+    <SearchTerm>STMicroelectronics secure elements post-quantum cryptography</SearchTerm>
+    <Tier>Infrastructure</Tier>
+  </Company>
+  <Company>
+    <Name>Infineon Technologies AG</Name>
+    <Symbol>IFX.DE</Symbol>
+    <SearchTerm>Infineon post-quantum cryptography TPM secure element</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>NXP Semiconductors N.V.</Name>
+    <Symbol>NXPI</Symbol>
+    <SearchTerm>NXP secure elements PQC automotive IoT</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Cloudflare, Inc.</Name>
+    <Symbol>NET</Symbol>
+    <SearchTerm>Cloudflare post-quantum cryptography TLS deployment</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>Akamai Technologies, Inc.</Name>
+    <Symbol>AKAM</Symbol>
+    <SearchTerm>Akamai post-quantum cryptography edge security</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+  <Company>
+    <Name>SK Telecom Co., Ltd.</Name>
+    <Symbol>017670.KS</Symbol>
+    <SearchTerm>SK Telecom quantum key distribution QKD network</SearchTerm>
+    <Tier>Quantum Security</Tier>
+  </Company>
+
+  <Company>
+    <Name>Lockheed Martin Corporation</Name>
+    <Symbol>LMT</Symbol>
+    <SearchTerm>Lockheed Martin quantum computing research optimization</SearchTerm>
+    <Tier>Defense &amp; Research</Tier>
+  </Company>
+  <Company>
+    <Name>RTX Corporation</Name>
+    <Symbol>RTX</Symbol>
+    <SearchTerm>RTX quantum sensing quantum computing defense research</SearchTerm>
+    <Tier>Defense &amp; Research</Tier>
+  </Company>
+</QuantumMarketData>
