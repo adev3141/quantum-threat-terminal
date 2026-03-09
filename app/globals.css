@@ -141,4 +141,22 @@
   .glitch-text {
     @apply relative font-mono font-bold;
   }
+
+  .whitepaper-protected,
+  .whitepaper-protected * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .whitepaper-protected img,
+  .whitepaper-protected svg {
+    -webkit-user-drag: none;
+  }
+}
+
+@media print {
+  .whitepaper-protected {
+    display: none !important;
+  }
 }

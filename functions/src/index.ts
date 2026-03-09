@@ -24,6 +24,248 @@ const gnewsApiKey = defineSecret("GNEWS_API_KEY");
 const adminTriggerKey = defineSecret("ADMIN_TRIGGER_KEY");
 const XML_PATH = join(__dirname, "../src/data/quantum_companies.xml");
 const GNEWS_BATCH_SIZE = 2;
+const METRIQ_API_BASE_URL = "https://metriq.info/api/task";
+const METRICS_STALE_AFTER_HOURS = 36;
+const RISK_SIGNALS_STALE_AFTER_HOURS = 36;
+const DEFAULT_GLOBAL_METRICS_METHOD_NOTE =
+  "Composite RSA-2048 readiness model using curated Metriq AQ, error-correction, quality, and scale frontier tasks.";
+const LEGACY_GLOBAL_METRICS_METHOD_NOTES = new Set([
+  "Threshold-based RSA-2048 delta using curated Metriq logical-qubit SOTA records.",
+]);
+const METRIQ_QV_REFERENCE = 1048576;
+const METRIQ_PHYSICAL_QUBITS_REFERENCE = 100000;
+const METRIQ_SURFACE_CODE_REFERENCE = 31;
+const METRIQ_COHERENCE_REFERENCE_US = 1000;
+
+type MetriqTaskKey =
+  | "aq"
+  | "physicalQubits"
+  | "twoQubitFidelity"
+  | "logicalErrorRate"
+  | "surfaceCode"
+  | "readoutFidelity"
+  | "coherenceT2"
+  | "quantumVolume"
+  | "faultTolerantQecLogicalErrorRate"
+  | "singleQubitGateSpeed"
+  | "twoQubitGateSpeed"
+  | "qecDecoding"
+  | "shorOrderFinding"
+  | "integerFactoring";
+
+type MetriqSignalTier = "production" | "diagnostic";
+
+type MetriqNormalizationStrategy =
+  | "log-upper"
+  | "linear"
+  | "inverse-log"
+  | "inverse-linear"
+  | "none";
+
+type MetriqTaskConfig = {
+  key: MetriqTaskKey;
+  taskId: number;
+  label: string;
+  signalTier: MetriqSignalTier;
+  acceptedMetricNames?: string[];
+  metricAliases?: string[];
+  requirePlatformAttribution?: boolean;
+  allowPaperOnly?: boolean;
+  referenceValue?: number;
+  lowerReference?: number;
+  upperReference?: number;
+  selectionRule: "max" | "min";
+  normalizationStrategy: MetriqNormalizationStrategy;
+  weight: number;
+  required?: boolean;
+};
+
+const METRIQ_TASK_CONFIGS: MetriqTaskConfig[] = [
+  {
+    key: "aq",
+    taskId: 128,
+    label: "Algorithmic Qubits",
+    signalTier: "production",
+    acceptedMetricNames: ["Algorithmic Qubits"],
+    metricAliases: ["Algorithmic Qubits"],
+    requirePlatformAttribution: true,
+    referenceValue: 256,
+    normalizationStrategy: "log-upper",
+    selectionRule: "max",
+    weight: 0.24,
+    required: true,
+  },
+  {
+    key: "physicalQubits",
+    taskId: 159,
+    label: "Number of physical qubits",
+    signalTier: "production",
+    acceptedMetricNames: ["Qubits", "Number of physical qubits"],
+    metricAliases: ["Number of physical qubits", "Physical qubits"],
+    requirePlatformAttribution: true,
+    referenceValue: METRIQ_PHYSICAL_QUBITS_REFERENCE,
+    normalizationStrategy: "log-upper",
+    selectionRule: "max",
+    weight: 0.08,
+  },
+  {
+    key: "twoQubitFidelity",
+    taskId: 53,
+    label: "2-qubit Clifford gate fidelity",
+    signalTier: "production",
+    metricAliases: [
+      "2-qubit Clifford gate fidelity",
+      "2-qubit gate fidelity",
+      "Two-qubit gate fidelity",
+    ],
+    requirePlatformAttribution: true,
+    lowerReference: 98,
+    upperReference: 99.99,
+    normalizationStrategy: "linear",
+    selectionRule: "max",
+    weight: 0.15,
+  },
+  {
+    key: "logicalErrorRate",
+    taskId: 60,
+    label: "Error correction and mitigation",
+    signalTier: "production",
+    acceptedMetricNames: ["Logical error rate"],
+    metricAliases: ["Error correction and mitigation", "Logical error rate", "Error rate"],
+    requirePlatformAttribution: true,
+    selectionRule: "min",
+    normalizationStrategy: "inverse-log",
+    lowerReference: 1e-1,
+    upperReference: 1e-6,
+    weight: 0.2,
+  },
+  {
+    key: "surfaceCode",
+    taskId: 189,
+    label: "Surface code",
+    signalTier: "production",
+    metricAliases: ["Surface code", "Code distance", "Distance"],
+    requirePlatformAttribution: true,
+    lowerReference: 3,
+    upperReference: METRIQ_SURFACE_CODE_REFERENCE,
+    normalizationStrategy: "linear",
+    selectionRule: "max",
+    weight: 0.14,
+  },
+  {
+    key: "readoutFidelity",
+    taskId: 198,
+    label: "Single-qubit measurement fidelity",
+    signalTier: "production",
+    metricAliases: [
+      "Single-qubit measurement fidelity",
+      "Measurement fidelity",
+      "Readout fidelity",
+    ],
+    requirePlatformAttribution: true,
+    lowerReference: 90,
+    upperReference: 99.99,
+    normalizationStrategy: "linear",
+    selectionRule: "max",
+    weight: 0.05,
+  },
+  {
+    key: "coherenceT2",
+    taskId: 50,
+    label: "Coherence time (T2)",
+    signalTier: "production",
+    metricAliases: ["Coherence time (T2)", "T2", "Coherence"],
+    requirePlatformAttribution: true,
+    referenceValue: METRIQ_COHERENCE_REFERENCE_US,
+    normalizationStrategy: "log-upper",
+    selectionRule: "max",
+    weight: 0.04,
+  },
+  {
+    key: "quantumVolume",
+    taskId: 34,
+    label: "Quantum volume",
+    signalTier: "production",
+    metricAliases: ["Quantum volume"],
+    requirePlatformAttribution: true,
+    referenceValue: METRIQ_QV_REFERENCE,
+    normalizationStrategy: "log-upper",
+    selectionRule: "max",
+    weight: 0.1,
+  },
+  {
+    key: "faultTolerantQecLogicalErrorRate",
+    taskId: 141,
+    label: "Fault-tolerant quantum error correction (QEC)",
+    signalTier: "production",
+    acceptedMetricNames: ["Logical error rate"],
+    requirePlatformAttribution: true,
+    selectionRule: "min",
+    normalizationStrategy: "inverse-log",
+    lowerReference: 1e-1,
+    upperReference: 1e-6,
+    weight: 0.12,
+  },
+  {
+    key: "singleQubitGateSpeed",
+    taskId: 223,
+    label: "Single-qubit gate speed",
+    signalTier: "production",
+    acceptedMetricNames: ["Time (s)"],
+    requirePlatformAttribution: true,
+    selectionRule: "min",
+    normalizationStrategy: "inverse-log",
+    lowerReference: 1e-3,
+    upperReference: 1e-6,
+    weight: 0,
+  },
+  {
+    key: "twoQubitGateSpeed",
+    taskId: 224,
+    label: "2-qubit gate speed",
+    signalTier: "production",
+    acceptedMetricNames: ["Time (s)"],
+    requirePlatformAttribution: true,
+    selectionRule: "min",
+    normalizationStrategy: "inverse-log",
+    lowerReference: 1e-2,
+    upperReference: 1e-6,
+    weight: 0,
+  },
+  {
+    key: "qecDecoding",
+    taskId: 192,
+    label: "QEC decoding",
+    signalTier: "diagnostic",
+    acceptedMetricNames: ["Latency (s)", "Time per round (s)"],
+    selectionRule: "min",
+    normalizationStrategy: "none",
+    allowPaperOnly: true,
+    weight: 0,
+  },
+  {
+    key: "shorOrderFinding",
+    taskId: 175,
+    label: "Shor's order-finding",
+    signalTier: "diagnostic",
+    acceptedMetricNames: ["Fidelity"],
+    selectionRule: "max",
+    normalizationStrategy: "none",
+    requirePlatformAttribution: true,
+    weight: 0,
+  },
+  {
+    key: "integerFactoring",
+    taskId: 4,
+    label: "Integer factoring",
+    signalTier: "diagnostic",
+    acceptedMetricNames: ["Factorized integer"],
+    selectionRule: "max",
+    normalizationStrategy: "none",
+    requirePlatformAttribution: true,
+    weight: 0,
+  },
+];
 
 type CompanyDoc = {
   symbol: string;
@@ -101,6 +343,326 @@ type ParsedCompany = {
   tier: string;
   tierNormalized: string;
   displayOrder: number;
+};
+
+type RiskReferenceDoc = {
+  webEncryptedShare: number;
+  pqTlsShare: number;
+  hndlWeightHarvestable: number;
+  hndlWeightCriticalSignals: number;
+  hndlWeightUnsupportedCoverage: number;
+  methodologyVersion: string;
+  lastReviewedAt: FieldValue | Timestamp;
+  updatedAt: FieldValue | Timestamp;
+};
+
+type SourceLink = {
+  label: string;
+  url: string;
+  note: string;
+};
+
+type CryptoReferenceDoc = {
+  rsa2048RequiredLogicalQubits: number;
+  forecastAnnualGrowthFactor: number;
+  forecastModel: "compound-logical-qubit-growth";
+  methodologyVersion: string;
+  targetRuntimeHours: number;
+  currentMaxAchievedLogicalQubitsOverride: number | null;
+  sourceLinks: SourceLink[];
+  notes: string | null;
+  updatedBy: string;
+  lastReviewedAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+type CryptoReferenceHistoryDoc = {
+  historyId: string;
+  changedAt: Timestamp;
+  changedBy: string;
+  reason: string;
+  previous: CryptoReferenceDoc | null;
+  next: CryptoReferenceDoc;
+  changeSummary: {
+    fieldsChanged: string[];
+  };
+};
+
+type UpdateCryptoReferenceRequest = {
+  patch?: Partial<{
+    rsa2048RequiredLogicalQubits: number;
+    forecastAnnualGrowthFactor: number;
+    methodologyVersion: string;
+    targetRuntimeHours: number;
+    currentMaxAchievedLogicalQubitsOverride: number | null;
+    sourceLinks: SourceLink[];
+    notes: string | null;
+  }>;
+  changedBy?: string;
+  reason?: string;
+};
+
+type GlobalMetricsMethodologyDoc = {
+  rsa_2048_required_lq: number;
+  annual_growth_factor_central: number;
+  annual_growth_factor_low: number;
+  annual_growth_factor_high: number;
+  q_day_target_runtime_hours: number;
+  include_only_curated_records: boolean;
+  allowed_task_names: string[];
+  allowed_platform_names: string[];
+  reject_theoretical_records: boolean;
+  methodology_version: string;
+  methodology_note: string;
+  updatedAt: Timestamp;
+};
+
+type UpdateGlobalMetricsMethodologyRequest = {
+  patch?: Partial<{
+    rsa_2048_required_lq: number;
+    annual_growth_factor_central: number;
+    annual_growth_factor_low: number;
+    annual_growth_factor_high: number;
+    q_day_target_runtime_hours: number;
+    include_only_curated_records: boolean;
+    allowed_task_names: string[];
+    allowed_platform_names: string[];
+    reject_theoretical_records: boolean;
+    methodology_version: string;
+    methodology_note: string;
+  }>;
+  changedBy?: string;
+  reason?: string;
+};
+
+type GlobalMetricsMethodologyHistoryDoc = {
+  historyId: string;
+  changedAt: Timestamp;
+  previous: GlobalMetricsMethodologyDoc | null;
+  next: GlobalMetricsMethodologyDoc;
+  changedBy: string;
+  reason: string;
+};
+
+type MetriqTaskResult = Record<string, unknown> & {
+  metricValue?: string | number;
+  metricName?: string;
+  isHigherBetter?: boolean;
+  submissionName?: string;
+  platformName?: string;
+  providerName?: string;
+  submissionId?: string | number;
+  submissionPlatformRefId?: string | number;
+};
+
+type MetriqTaskResponse = {
+  data?: {
+    id?: number;
+    name?: string;
+    fullName?: string;
+    results?: MetriqTaskResult[];
+  };
+};
+
+type GlobalMetricsSelectedRecord = {
+  isSota: boolean;
+  sotaValueRaw: string;
+  sotaValueParsed: number;
+  title: string | null;
+  platformName: string | null;
+  taskName: string | null;
+  rawSnapshot: Record<string, unknown>;
+};
+
+type GlobalMetricsDoc = {
+  current_sota_lq: number;
+  current_sota_source_label: string;
+  current_sota_submission_id: string | null;
+  current_sota_platform_id: string | null;
+  rsa_2048_required_lq: number;
+  rsa_2048_delta: number;
+  rsa_2048_status_percent: number;
+  q_day_target_runtime_hours: number;
+  years_to_qday_central: number;
+  years_to_qday_low: number;
+  years_to_qday_high: number;
+  q_day_year_central: number;
+  q_day_year_low: number;
+  q_day_year_high: number;
+  q_day_estimate_date_central: Timestamp;
+  annual_growth_factor_central: number;
+  annual_growth_factor_low: number;
+  annual_growth_factor_high: number;
+  methodology_version: string;
+  methodology_note: string;
+  source: "metriq-curated";
+  source_url: string;
+  leader_metric_basis: string;
+  composite_readiness_percent: number;
+  utility_frontier_percent: number;
+  fault_tolerance_bridge_percent: number;
+  frontier_dependency_version: string;
+  frontier_signals: Partial<Record<MetriqTaskKey, FrontierSignal>>;
+  is_stale: boolean;
+  stale_after_hours: number;
+  selected_record: GlobalMetricsSelectedRecord;
+  last_successful_sync: Timestamp;
+  last_attempted_sync: Timestamp;
+};
+
+type GlobalMetricsHistoryDoc = {
+  historyId: string;
+  publishedAt: Timestamp;
+  previous: GlobalMetricsDoc | null;
+  next: GlobalMetricsDoc;
+  reason: "scheduled-sync" | "manual-sync";
+};
+
+type FrontierAttributionStatus =
+  | "direct"
+  | "provider-only"
+  | "platform-ref-only"
+  | "unattributed";
+
+type FrontierSignal = {
+  taskId: number;
+  taskName: string;
+  acceptedMetricName: string;
+  metricValue: number;
+  selectionRule: "max" | "min";
+  normalizationStrategy: MetriqNormalizationStrategy;
+  normalizationParams: {
+    referenceValue?: number;
+    lowerReference?: number;
+    upperReference?: number;
+  };
+  normalizedScore: number | null;
+  sourceLabel: string;
+  submissionId: string | null;
+  platformId: string | null;
+  evaluatedAt: Timestamp | null;
+  attributionStatus: FrontierAttributionStatus;
+  status: "selected" | "diagnostic" | "excluded";
+  exclusionReason: string | null;
+  rawSnapshot: Record<string, unknown>;
+};
+
+type FrontierExclusion = {
+  taskId: number;
+  taskKey: MetriqTaskKey;
+  taskName: string;
+  signalTier: MetriqSignalTier;
+  required: boolean;
+  reason: string;
+};
+
+type GlobalMetriqFrontierDoc = {
+  productionSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>;
+  diagnosticSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>;
+  excludedSignals: FrontierExclusion[];
+  methodologyVersion: string;
+  source: "metriq-curated";
+  sourceUrlBase: string;
+  lastSuccessfulSync: Timestamp;
+  lastAttemptedSync: Timestamp;
+  isStale: boolean;
+  staleAfterHours: number;
+};
+
+type GlobalMetriqFrontierHistoryDoc = {
+  historyId: string;
+  publishedAt: Timestamp;
+  previous: GlobalMetriqFrontierDoc | null;
+  next: GlobalMetriqFrontierDoc;
+  reason: "scheduled-sync" | "manual-sync";
+};
+
+type GlobalRiskMethodologyDoc = {
+  encryptedTrafficShare: number;
+  pqProtectedShare: number;
+  utilityWeights: {
+    aq: number;
+    quantumVolume: number;
+  };
+  hardwareScaleWeights: {
+    physicalQubits: number;
+  };
+  gateQualityWeights: {
+    twoQubitFidelity: number;
+    readoutFidelity: number;
+    coherenceT2: number;
+  };
+  runtimeWeights: {
+    singleQubitGateSpeed: number;
+    twoQubitGateSpeed: number;
+  };
+  faultToleranceWeights: {
+    errorCorrectionMitigation: number;
+    surfaceCode: number;
+    faultTolerantQecLogicalErrorRate: number;
+  };
+  hndlWeights: {
+    faultTolerance: number;
+    runtimePracticality: number;
+    gateQuality: number;
+    hardwareScale: number;
+    utilityFrontier: number;
+  };
+  methodologyVersion: string;
+  methodologyNote: string;
+  updatedAt: Timestamp;
+};
+
+type UpdateGlobalRiskMethodologyRequest = {
+  patch?: Partial<GlobalRiskMethodologyDoc>;
+  changedBy?: string;
+  reason?: string;
+};
+
+type GlobalRiskMethodologyHistoryDoc = {
+  historyId: string;
+  changedAt: Timestamp;
+  previous: GlobalRiskMethodologyDoc | null;
+  next: GlobalRiskMethodologyDoc;
+  changedBy: string;
+  reason: string;
+};
+
+type RiskAxis = {
+  label: string;
+  value: number | null;
+  status: "direct" | "modelled" | "unavailable";
+  detail: string;
+  sourceTasks: number[];
+};
+
+type GlobalRiskSignalsDoc = {
+  threatMatrixAxes: {
+    utilityFrontier: RiskAxis;
+    hardwareScale: RiskAxis;
+    gateQuality: RiskAxis;
+    runtimePracticality: RiskAxis;
+    faultTolerance: RiskAxis;
+    cryptanalyticRelevance: RiskAxis;
+  };
+  harvestableShare: number;
+  cryptanalyticReadinessCore: number;
+  hndlPressure: number;
+  hndlStatus: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  methodologyVersion: string;
+  methodologyNote: string;
+  isStale: boolean;
+  staleAfterHours: number;
+  lastSuccessfulSync: Timestamp;
+  lastAttemptedSync: Timestamp;
+};
+
+type GlobalRiskSignalsHistoryDoc = {
+  historyId: string;
+  publishedAt: Timestamp;
+  previous: GlobalRiskSignalsDoc | null;
+  next: GlobalRiskSignalsDoc;
+  reason: "scheduled-sync" | "manual-sync";
 };
 
 type FinnhubQuoteResponse = {
@@ -212,6 +774,380 @@ export const seedCompaniesFromXml = onRequest(async (req, res) => {
     res.status(500).json({ok: false, error: message});
   }
 });
+
+export const seedRiskReference = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    const provided = req.get("x-admin-key");
+    const expected = adminTriggerKey.value();
+    if (!provided || provided !== expected) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const payload: RiskReferenceDoc = {
+      webEncryptedShare: 0.95,
+      pqTlsShare: 0.13,
+      hndlWeightHarvestable: 0.7,
+      hndlWeightCriticalSignals: 0.2,
+      hndlWeightUnsupportedCoverage: 0.1,
+      methodologyVersion: "2026-03-07",
+      lastReviewedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("risk_reference").doc("current").set(payload, {merge: true});
+    res.json({ok: true, riskReference: payload});
+  },
+);
+
+export const seedCryptoReference = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    const provided = req.get("x-admin-key");
+    const expected = adminTriggerKey.value();
+    if (!provided || provided !== expected) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const payload: CryptoReferenceDoc = {
+      rsa2048RequiredLogicalQubits: 1400,
+      forecastAnnualGrowthFactor: 1.8,
+      forecastModel: "compound-logical-qubit-growth",
+      methodologyVersion: "2026-03-08",
+      targetRuntimeHours: 24,
+      currentMaxAchievedLogicalQubitsOverride: null,
+      sourceLinks: [],
+      notes: null,
+      updatedBy: "seedCryptoReference",
+      lastReviewedAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+
+    await db.collection("crypto_reference").doc("current").set(payload, {merge: true});
+    res.json({ok: true, cryptoReference: payload});
+  },
+);
+
+export const updateCryptoReference = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const body = typeof req.body === "object" && req.body !== null ?
+      req.body as UpdateCryptoReferenceRequest :
+      {};
+    const changedBy = normalizeNonEmptyString(body.changedBy);
+    const reason = normalizeNonEmptyString(body.reason);
+    const patch = body.patch;
+
+    if (!changedBy) {
+      res.status(400).json({ok: false, error: "changedBy is required"});
+      return;
+    }
+
+    if (!reason) {
+      res.status(400).json({ok: false, error: "reason is required"});
+      return;
+    }
+
+    if (!patch || typeof patch !== "object" || Object.keys(patch).length === 0) {
+      res.status(400).json({ok: false, error: "patch must contain at least one field"});
+      return;
+    }
+
+    try {
+      const currentRef = db.collection("crypto_reference").doc("current");
+      const historyRef = db.collection("crypto_reference_history").doc();
+
+      const result = await db.runTransaction(async (transaction) => {
+        const currentSnapshot = await transaction.get(currentRef);
+        if (!currentSnapshot.exists) {
+          throw new HttpStatusError(404, "crypto_reference/current not found");
+        }
+
+        const current = currentSnapshot.data() as CryptoReferenceDoc;
+        const sanitizedPatch = normalizeCryptoReferencePatch(patch);
+        const next = validateMergedCryptoReference(current, sanitizedPatch, changedBy);
+        const fieldsChanged = getChangedCryptoReferenceFields(current, next);
+        if (fieldsChanged.length === 0) {
+          throw new HttpStatusError(400, "patch did not change any fields");
+        }
+
+        const historyId = historyRef.id;
+        const historyDoc: CryptoReferenceHistoryDoc = {
+          historyId,
+          changedAt: next.updatedAt,
+          changedBy,
+          reason,
+          previous: current,
+          next,
+          changeSummary: {
+            fieldsChanged,
+          },
+        };
+
+        transaction.set(currentRef, next);
+        transaction.set(historyRef, historyDoc);
+
+        return {current: next, historyId};
+      });
+
+      res.json({ok: true, current: result.current, historyId: result.historyId});
+    } catch (error) {
+      const status = error instanceof HttpStatusError ? error.status : 500;
+      res.status(status).json({ok: false, error: toErrorMessage(error)});
+    }
+  },
+);
+
+export const seedGlobalMetricsMethodology = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const methodology = buildDefaultGlobalMetricsMethodology();
+    await db.collection("global").doc("metrics_methodology").set(methodology, {merge: true});
+    res.json({ok: true, methodology});
+  },
+);
+
+export const updateGlobalMetricsMethodology = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const body = typeof req.body === "object" && req.body !== null ?
+      req.body as UpdateGlobalMetricsMethodologyRequest :
+      {};
+    const patch = body.patch;
+    const changedBy = typeof body.changedBy === "string" ? body.changedBy.trim() : "";
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (!patch || typeof patch !== "object" || Object.keys(patch).length === 0) {
+      res.status(400).json({ok: false, error: "patch must contain at least one field"});
+      return;
+    }
+    if (!changedBy) {
+      res.status(400).json({ok: false, error: "changedBy must be a non-empty string"});
+      return;
+    }
+    if (!reason) {
+      res.status(400).json({ok: false, error: "reason must be a non-empty string"});
+      return;
+    }
+
+    try {
+      const currentRef = db.collection("global").doc("metrics_methodology");
+      const historyRef = db.collection("global_metrics_methodology_history").doc();
+      const result = await db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(currentRef);
+        const current = snapshot.exists ?
+          validateGlobalMetricsMethodology(snapshot.data() as Partial<GlobalMetricsMethodologyDoc>) :
+          buildDefaultGlobalMetricsMethodology();
+        const next = validateGlobalMetricsMethodology({
+          ...current,
+          ...patch,
+        });
+        const historyDoc: GlobalMetricsMethodologyHistoryDoc = {
+          historyId: historyRef.id,
+          changedAt: next.updatedAt,
+          previous: snapshot.exists ? current : null,
+          next,
+          changedBy,
+          reason,
+        };
+        transaction.set(currentRef, next);
+        transaction.set(historyRef, historyDoc);
+        return {methodology: next, historyId: historyRef.id};
+      });
+
+      res.json({ok: true, methodology: result.methodology, historyId: result.historyId});
+    } catch (error) {
+      const status = error instanceof HttpStatusError ? error.status : 500;
+      res.status(status).json({ok: false, error: toErrorMessage(error)});
+    }
+  },
+);
+
+export const seedGlobalRiskMethodology = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const methodology = buildDefaultGlobalRiskMethodology();
+    await db.collection("global").doc("risk_methodology").set(methodology, {merge: true});
+    res.json({ok: true, methodology});
+  },
+);
+
+export const updateGlobalRiskMethodology = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    const body = typeof req.body === "object" && req.body !== null ?
+      req.body as UpdateGlobalRiskMethodologyRequest :
+      {};
+    const patch = body.patch;
+    const changedBy = typeof body.changedBy === "string" ? body.changedBy.trim() : "";
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (!patch || typeof patch !== "object" || Object.keys(patch).length === 0) {
+      res.status(400).json({ok: false, error: "patch must contain at least one field"});
+      return;
+    }
+    if (!changedBy) {
+      res.status(400).json({ok: false, error: "changedBy must be a non-empty string"});
+      return;
+    }
+    if (!reason) {
+      res.status(400).json({ok: false, error: "reason must be a non-empty string"});
+      return;
+    }
+
+    try {
+      const currentRef = db.collection("global").doc("risk_methodology");
+      const historyRef = db.collection("global_risk_methodology_history").doc();
+      const result = await db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(currentRef);
+        const current = snapshot.exists ?
+          validateGlobalRiskMethodology(snapshot.data() as Partial<GlobalRiskMethodologyDoc>) :
+          buildDefaultGlobalRiskMethodology();
+        const next = validateGlobalRiskMethodology({
+          ...current,
+          ...patch,
+        });
+        const historyDoc: GlobalRiskMethodologyHistoryDoc = {
+          historyId: historyRef.id,
+          changedAt: next.updatedAt,
+          previous: snapshot.exists ? current : null,
+          next,
+          changedBy,
+          reason,
+        };
+        transaction.set(currentRef, next);
+        transaction.set(historyRef, historyDoc);
+        return {methodology: next, historyId: historyRef.id};
+      });
+
+      res.json({ok: true, methodology: result.methodology, historyId: result.historyId});
+    } catch (error) {
+      const status = error instanceof HttpStatusError ? error.status : 500;
+      res.status(status).json({ok: false, error: toErrorMessage(error)});
+    }
+  },
+);
+
+export const syncMetriqMetrics = onSchedule(
+  {
+    schedule: "every 24 hours",
+    region: "us-central1",
+  },
+  async () => {
+    await syncMetriqMetricsData("scheduled-sync");
+  },
+);
+
+export const manualSyncMetriqMetrics = onRequest(
+  {
+    region: "us-central1",
+    secrets: [adminTriggerKey],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ok: false, error: "Method not allowed"});
+      return;
+    }
+
+    if (!isAuthorizedAdminRequest(req, adminTriggerKey.value())) {
+      res.status(401).json({ok: false, error: "Unauthorized"});
+      return;
+    }
+
+    try {
+      const result = await syncMetriqMetricsData("manual-sync");
+      res.json({
+        ok: result.errors.length === 0,
+        partial: result.errors.length > 0,
+        ...result,
+      });
+    } catch (error) {
+      const status = error instanceof HttpStatusError ? error.status : 500;
+      res.status(status).json({ok: false, error: toErrorMessage(error)});
+    }
+  },
+);
 
 export const syncFinnhubQuotes = onSchedule(
   {
@@ -630,6 +1566,1356 @@ function isAuthorizedAdminRequest(
   return typeof candidate === "string" && candidate.length > 0 && candidate === expectedKey;
 }
 
+function normalizeNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeCryptoReferencePatch(
+  patch: UpdateCryptoReferenceRequest["patch"],
+): Partial<Omit<CryptoReferenceDoc, "forecastModel" | "updatedBy" | "updatedAt" | "lastReviewedAt">> {
+  const nextPatch: Partial<Omit<CryptoReferenceDoc, "forecastModel" | "updatedBy" | "updatedAt" | "lastReviewedAt">> = {};
+  if (!patch) {
+    return nextPatch;
+  }
+
+  if ("rsa2048RequiredLogicalQubits" in patch) {
+    nextPatch.rsa2048RequiredLogicalQubits = patch.rsa2048RequiredLogicalQubits;
+  }
+  if ("forecastAnnualGrowthFactor" in patch) {
+    nextPatch.forecastAnnualGrowthFactor = patch.forecastAnnualGrowthFactor;
+  }
+  if ("methodologyVersion" in patch) {
+    nextPatch.methodologyVersion = patch.methodologyVersion;
+  }
+  if ("targetRuntimeHours" in patch) {
+    nextPatch.targetRuntimeHours = patch.targetRuntimeHours;
+  }
+  if ("currentMaxAchievedLogicalQubitsOverride" in patch) {
+    nextPatch.currentMaxAchievedLogicalQubitsOverride = patch.currentMaxAchievedLogicalQubitsOverride;
+  }
+  if ("sourceLinks" in patch) {
+    nextPatch.sourceLinks = patch.sourceLinks;
+  }
+  if ("notes" in patch) {
+    nextPatch.notes = patch.notes;
+  }
+
+  return nextPatch;
+}
+
+function validateMergedCryptoReference(
+  current: CryptoReferenceDoc,
+  patch: Partial<Omit<CryptoReferenceDoc, "forecastModel" | "updatedBy" | "updatedAt" | "lastReviewedAt">>,
+  changedBy: string,
+): CryptoReferenceDoc {
+  const now = Timestamp.now();
+  const next: CryptoReferenceDoc = {
+    rsa2048RequiredLogicalQubits: validateInteger(
+      patch.rsa2048RequiredLogicalQubits ?? current.rsa2048RequiredLogicalQubits,
+      "rsa2048RequiredLogicalQubits",
+      1,
+      100000,
+    ),
+    forecastAnnualGrowthFactor: validateNumber(
+      patch.forecastAnnualGrowthFactor ?? current.forecastAnnualGrowthFactor,
+      "forecastAnnualGrowthFactor",
+      1,
+      5,
+      false,
+    ),
+    forecastModel: "compound-logical-qubit-growth",
+    methodologyVersion: validateRequiredString(
+      patch.methodologyVersion ?? current.methodologyVersion,
+      "methodologyVersion",
+    ),
+    targetRuntimeHours: validateInteger(
+      patch.targetRuntimeHours ?? current.targetRuntimeHours,
+      "targetRuntimeHours",
+      1,
+      168,
+    ),
+    currentMaxAchievedLogicalQubitsOverride: validateNullableInteger(
+      patch.currentMaxAchievedLogicalQubitsOverride ?? current.currentMaxAchievedLogicalQubitsOverride ?? null,
+      "currentMaxAchievedLogicalQubitsOverride",
+      0,
+    ),
+    sourceLinks: validateSourceLinks(patch.sourceLinks ?? current.sourceLinks ?? []),
+    notes: validateNullableString(patch.notes ?? current.notes ?? null, "notes"),
+    updatedBy: changedBy,
+    lastReviewedAt: now,
+    updatedAt: now,
+  };
+
+  return next;
+}
+
+function validateInteger(value: unknown, field: string, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new HttpStatusError(400, `${field} must be an integer between ${min} and ${max}`);
+  }
+  return value;
+}
+
+function validateNullableInteger(value: unknown, field: string, min: number): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min) {
+    throw new HttpStatusError(400, `${field} must be null or an integer >= ${min}`);
+  }
+  return value;
+}
+
+function validateNumber(
+  value: unknown,
+  field: string,
+  min: number,
+  max: number,
+  allowMin: boolean,
+): number {
+  const valid =
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    (allowMin ? value >= min : value > min) &&
+    value <= max;
+  if (!valid) {
+    throw new HttpStatusError(400, `${field} must be ${allowMin ? ">=" : ">"} ${min} and <= ${max}`);
+  }
+  return value;
+}
+
+function validateRequiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new HttpStatusError(400, `${field} must be a non-empty string`);
+  }
+  return value.trim();
+}
+
+function validateNullableString(value: unknown, field: string): string | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new HttpStatusError(400, `${field} must be a string or null`);
+  }
+  return value.trim() || null;
+}
+
+function validateSourceLinks(value: unknown): SourceLink[] {
+  if (!Array.isArray(value)) {
+    throw new HttpStatusError(400, "sourceLinks must be an array");
+  }
+  if (value.length > 10) {
+    throw new HttpStatusError(400, "sourceLinks must contain at most 10 items");
+  }
+
+  return value.map((entry, index) => {
+    if (typeof entry !== "object" || entry === null) {
+      throw new HttpStatusError(400, `sourceLinks[${index}] must be an object`);
+    }
+
+    const sourceLink = entry as Partial<SourceLink>;
+    const label = validateRequiredString(sourceLink.label, `sourceLinks[${index}].label`);
+    const url = validateHttpsUrl(sourceLink.url, `sourceLinks[${index}].url`);
+    const note = validateRequiredString(sourceLink.note, `sourceLinks[${index}].note`);
+    return {label, url, note};
+  });
+}
+
+function validateHttpsUrl(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new HttpStatusError(400, `${field} must be a non-empty https URL`);
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") {
+      throw new Error("Invalid protocol");
+    }
+    return parsed.toString();
+  } catch {
+    throw new HttpStatusError(400, `${field} must be a valid https URL`);
+  }
+}
+
+function getChangedCryptoReferenceFields(previous: CryptoReferenceDoc, next: CryptoReferenceDoc): string[] {
+  const changed: string[] = [];
+  const fields: Array<keyof Omit<CryptoReferenceDoc, "updatedAt" | "lastReviewedAt" | "updatedBy">> = [
+    "rsa2048RequiredLogicalQubits",
+    "forecastAnnualGrowthFactor",
+    "forecastModel",
+    "methodologyVersion",
+    "targetRuntimeHours",
+    "currentMaxAchievedLogicalQubitsOverride",
+    "sourceLinks",
+    "notes",
+  ];
+
+  fields.forEach((field) => {
+    if (JSON.stringify(previous[field]) !== JSON.stringify(next[field])) {
+      changed.push(field);
+    }
+  });
+
+  if (previous.updatedBy !== next.updatedBy) {
+    changed.push("updatedBy");
+  }
+
+  return changed;
+}
+
+function buildDefaultGlobalMetricsMethodology(): GlobalMetricsMethodologyDoc {
+  return {
+    rsa_2048_required_lq: 1400,
+    annual_growth_factor_central: 1.8,
+    annual_growth_factor_low: 1.5,
+    annual_growth_factor_high: 2.0,
+    q_day_target_runtime_hours: 24,
+    include_only_curated_records: true,
+    allowed_task_names: buildDefaultGlobalMetricsTaskNames(),
+    allowed_platform_names: [
+      "ibm",
+      "google",
+      "quantinuum",
+      "microsoft",
+      "ionq",
+      "rigetti",
+      "intel",
+      "fujitsu",
+      "d-wave",
+      "dwave",
+    ],
+    reject_theoretical_records: true,
+    methodology_version: "metriq-curated-v1",
+    methodology_note: DEFAULT_GLOBAL_METRICS_METHOD_NOTE,
+    updatedAt: Timestamp.now(),
+  };
+}
+
+function validateGlobalMetricsMethodology(
+  value: Partial<GlobalMetricsMethodologyDoc>,
+): GlobalMetricsMethodologyDoc {
+  const methodologyNote = normalizeGlobalMetricsMethodologyNote(
+    validateRequiredString(
+      value.methodology_note,
+      "methodology_note",
+    ),
+  );
+
+  return {
+    rsa_2048_required_lq: validateInteger(
+      value.rsa_2048_required_lq,
+      "rsa_2048_required_lq",
+      1,
+      100000,
+    ),
+    annual_growth_factor_central: validateNumber(
+      value.annual_growth_factor_central,
+      "annual_growth_factor_central",
+      1,
+      5,
+      false,
+    ),
+    annual_growth_factor_low: validateNumber(
+      value.annual_growth_factor_low,
+      "annual_growth_factor_low",
+      1,
+      5,
+      false,
+    ),
+    annual_growth_factor_high: validateNumber(
+      value.annual_growth_factor_high,
+      "annual_growth_factor_high",
+      1,
+      5,
+      false,
+    ),
+    q_day_target_runtime_hours: validateInteger(
+      value.q_day_target_runtime_hours,
+      "q_day_target_runtime_hours",
+      1,
+      168,
+    ),
+    include_only_curated_records: validateBoolean(
+      value.include_only_curated_records,
+      "include_only_curated_records",
+    ),
+    allowed_task_names: normalizeAllowedTaskNames(
+      validateStringArray(value.allowed_task_names, "allowed_task_names"),
+    ),
+    allowed_platform_names: validateStringArray(value.allowed_platform_names, "allowed_platform_names"),
+    reject_theoretical_records: validateBoolean(
+      value.reject_theoretical_records,
+      "reject_theoretical_records",
+    ),
+    methodology_version: validateRequiredString(
+      value.methodology_version,
+      "methodology_version",
+    ),
+    methodology_note: methodologyNote,
+    updatedAt: Timestamp.now(),
+  };
+}
+
+function buildDefaultGlobalRiskMethodology(): GlobalRiskMethodologyDoc {
+  return {
+    encryptedTrafficShare: 0.95,
+    pqProtectedShare: 0.13,
+    utilityWeights: {
+      aq: 0.7,
+      quantumVolume: 0.3,
+    },
+    hardwareScaleWeights: {
+      physicalQubits: 1,
+    },
+    gateQualityWeights: {
+      twoQubitFidelity: 0.5,
+      readoutFidelity: 0.2,
+      coherenceT2: 0.3,
+    },
+    runtimeWeights: {
+      singleQubitGateSpeed: 0.35,
+      twoQubitGateSpeed: 0.65,
+    },
+    faultToleranceWeights: {
+      errorCorrectionMitigation: 0.35,
+      surfaceCode: 0.3,
+      faultTolerantQecLogicalErrorRate: 0.35,
+    },
+    hndlWeights: {
+      faultTolerance: 0.45,
+      runtimePracticality: 0.2,
+      gateQuality: 0.15,
+      hardwareScale: 0.1,
+      utilityFrontier: 0.1,
+    },
+    methodologyVersion: "global-risk-signals-v1",
+    methodologyNote: "Global frontier risk model using curated Metriq utility, scale, quality, runtime, and fault-tolerance signals.",
+    updatedAt: Timestamp.now(),
+  };
+}
+
+function validateWeightMap(
+  value: unknown,
+  field: string,
+  expectedKeys: string[],
+): Record<string, number> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new HttpStatusError(400, `${field} must be an object`);
+  }
+
+  const record = value as Record<string, unknown>;
+  const validated = Object.fromEntries(
+    expectedKeys.map((key) => [
+      key,
+      validateNumber(record[key], `${field}.${key}`, 0, 1, true),
+    ]),
+  );
+
+  return validated;
+}
+
+function validateGlobalRiskMethodology(
+  value: Partial<GlobalRiskMethodologyDoc>,
+): GlobalRiskMethodologyDoc {
+  const encryptedTrafficShare = validateNumber(
+    value.encryptedTrafficShare,
+    "encryptedTrafficShare",
+    0,
+    1,
+    true,
+  );
+  const pqProtectedShare = validateNumber(
+    value.pqProtectedShare,
+    "pqProtectedShare",
+    0,
+    1,
+    true,
+  );
+
+  return {
+    encryptedTrafficShare,
+    pqProtectedShare,
+    utilityWeights: validateWeightMap(
+      value.utilityWeights,
+      "utilityWeights",
+      ["aq", "quantumVolume"],
+    ) as GlobalRiskMethodologyDoc["utilityWeights"],
+    hardwareScaleWeights: validateWeightMap(
+      value.hardwareScaleWeights,
+      "hardwareScaleWeights",
+      ["physicalQubits"],
+    ) as GlobalRiskMethodologyDoc["hardwareScaleWeights"],
+    gateQualityWeights: validateWeightMap(
+      value.gateQualityWeights,
+      "gateQualityWeights",
+      ["twoQubitFidelity", "readoutFidelity", "coherenceT2"],
+    ) as GlobalRiskMethodologyDoc["gateQualityWeights"],
+    runtimeWeights: validateWeightMap(
+      value.runtimeWeights,
+      "runtimeWeights",
+      ["singleQubitGateSpeed", "twoQubitGateSpeed"],
+    ) as GlobalRiskMethodologyDoc["runtimeWeights"],
+    faultToleranceWeights: validateWeightMap(
+      value.faultToleranceWeights,
+      "faultToleranceWeights",
+      ["errorCorrectionMitigation", "surfaceCode", "faultTolerantQecLogicalErrorRate"],
+    ) as GlobalRiskMethodologyDoc["faultToleranceWeights"],
+    hndlWeights: validateWeightMap(
+      value.hndlWeights,
+      "hndlWeights",
+      ["faultTolerance", "runtimePracticality", "gateQuality", "hardwareScale", "utilityFrontier"],
+    ) as GlobalRiskMethodologyDoc["hndlWeights"],
+    methodologyVersion: validateRequiredString(value.methodologyVersion, "methodologyVersion"),
+    methodologyNote: validateRequiredString(value.methodologyNote, "methodologyNote"),
+    updatedAt: Timestamp.now(),
+  };
+}
+
+function validateBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new HttpStatusError(400, `${field} must be a boolean`);
+  }
+  return value;
+}
+
+function validateStringArray(value: unknown, field: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new HttpStatusError(400, `${field} must be an array of strings`);
+  }
+  return value.map((entry, index) => validateRequiredString(entry, `${field}[${index}]`));
+}
+
+async function syncMetriqMetricsData(
+  reason: "scheduled-sync" | "manual-sync",
+): Promise<{
+  metrics: GlobalMetricsDoc | null;
+  frontier: GlobalMetriqFrontierDoc;
+  riskSignals: GlobalRiskSignalsDoc | null;
+  errors: string[];
+}> {
+  const runId = db.collection("ingestion_runs").doc().id;
+  const stats: IngestionStats = {
+    tasksFetched: 0,
+    tasksSucceeded: 0,
+    productionSignalsSelected: 0,
+    diagnosticSignalsSelected: 0,
+    selectedValue: 0,
+  };
+  const errors: string[] = [];
+  await startRun(runId, "syncMetriqMetrics", stats);
+
+  try {
+    const metricsMethodology = await getGlobalMetricsMethodology();
+    const riskMethodology = await getGlobalRiskMethodology();
+    const now = Timestamp.now();
+    const frontier = await fetchMetriqFrontierData(metricsMethodology, stats, now);
+    await publishGlobalMetriqFrontier(frontier, reason);
+    let metrics: GlobalMetricsDoc | null = null;
+    let riskSignals: GlobalRiskSignalsDoc | null = null;
+
+    try {
+      metrics = buildGlobalMetricsDoc(frontier.productionSignals, metricsMethodology, now);
+      stats.selectedValue = metrics.current_sota_lq;
+      await publishGlobalMetrics(metrics, reason);
+    } catch (error) {
+      errors.push(`global/metrics: ${toErrorMessage(error)}`);
+      await markGlobalDocsStale(["metrics"]);
+    }
+
+    try {
+      riskSignals = buildGlobalRiskSignalsDoc(
+        frontier.productionSignals,
+        riskMethodology,
+        frontier,
+        now,
+      );
+      await publishGlobalRiskSignals(riskSignals, reason);
+    } catch (error) {
+      errors.push(`global/risk_signals: ${toErrorMessage(error)}`);
+      await markGlobalDocsStale(["risk_signals"]);
+    }
+
+    const runStatus =
+      errors.length === 0 ? "ok" :
+        (metrics || riskSignals) ? "partial" :
+          "error";
+    await finishRun(runId, runStatus, stats, errors);
+
+    return {
+      metrics,
+      frontier,
+      riskSignals,
+      errors,
+    };
+  } catch (error) {
+    errors.push(toErrorMessage(error));
+    await markGlobalDocsStale(["metrics", "metriq_frontier", "risk_signals"]);
+    await finishRun(runId, "error", stats, errors);
+    throw error;
+  }
+}
+
+async function getGlobalMetricsMethodology(): Promise<GlobalMetricsMethodologyDoc> {
+  const snapshot = await db.collection("global").doc("metrics_methodology").get();
+  if (!snapshot.exists) {
+    return buildDefaultGlobalMetricsMethodology();
+  }
+  return validateGlobalMetricsMethodology({
+    ...buildDefaultGlobalMetricsMethodology(),
+    ...(snapshot.data() as Partial<GlobalMetricsMethodologyDoc>),
+  });
+}
+
+async function getGlobalRiskMethodology(): Promise<GlobalRiskMethodologyDoc> {
+  const snapshot = await db.collection("global").doc("risk_methodology").get();
+  if (!snapshot.exists) {
+    return buildDefaultGlobalRiskMethodology();
+  }
+  return validateGlobalRiskMethodology({
+    ...buildDefaultGlobalRiskMethodology(),
+    ...(snapshot.data() as Partial<GlobalRiskMethodologyDoc>),
+  });
+}
+
+async function fetchMetriqFrontierData(
+  methodology: GlobalMetricsMethodologyDoc,
+  stats: IngestionStats,
+  now: Timestamp,
+): Promise<GlobalMetriqFrontierDoc> {
+  const productionSignals: Partial<Record<MetriqTaskKey, FrontierSignal>> = {};
+  const diagnosticSignals: Partial<Record<MetriqTaskKey, FrontierSignal>> = {};
+  const excludedSignals: FrontierExclusion[] = [];
+
+  for (const config of METRIQ_TASK_CONFIGS) {
+    stats.tasksFetched += 1;
+
+    try {
+      const signal = await fetchMetriqTaskSignal(config, methodology);
+      if (!signal) {
+        excludedSignals.push({
+          taskId: config.taskId,
+          taskKey: config.key,
+          taskName: config.label,
+          signalTier: config.signalTier,
+          required: Boolean(config.required),
+          reason: "No curated result matched the configured task filters.",
+        });
+        continue;
+      }
+
+      stats.tasksSucceeded += 1;
+      if (config.signalTier === "production") {
+        productionSignals[config.key] = signal;
+        stats.productionSignalsSelected += 1;
+      } else {
+        diagnosticSignals[config.key] = signal;
+        stats.diagnosticSignalsSelected += 1;
+      }
+    } catch (error) {
+      excludedSignals.push({
+        taskId: config.taskId,
+        taskKey: config.key,
+        taskName: config.label,
+        signalTier: config.signalTier,
+        required: Boolean(config.required),
+        reason: toErrorMessage(error),
+      });
+      logger.warn("Skipping Metriq task after fetch or curation failure", {
+        taskId: config.taskId,
+        taskKey: config.key,
+        signalTier: config.signalTier,
+        required: Boolean(config.required),
+        error: toErrorMessage(error),
+      });
+    }
+  }
+
+  return {
+    productionSignals,
+    diagnosticSignals,
+    excludedSignals,
+    methodologyVersion: methodology.methodology_version,
+    source: "metriq-curated",
+    sourceUrlBase: METRIQ_API_BASE_URL,
+    lastSuccessfulSync: now,
+    lastAttemptedSync: now,
+    isStale: false,
+    staleAfterHours: METRICS_STALE_AFTER_HOURS,
+  };
+}
+
+async function fetchMetriqTaskSignal(
+  config: MetriqTaskConfig,
+  methodology: GlobalMetricsMethodologyDoc,
+): Promise<FrontierSignal | null> {
+  const response = await fetchJson<MetriqTaskResponse>(
+    `${METRIQ_API_BASE_URL}/${config.taskId}`,
+    1,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+  const taskData = response.data;
+  if (!taskData || !Array.isArray(taskData.results)) {
+    throw new HttpStatusError(502, `Metriq task ${config.taskId} response was missing results[]`);
+  }
+
+  const selectedResult = selectBestMetriqResult(taskData, config, methodology);
+  if (!selectedResult) {
+    return null;
+  }
+
+  const signal: FrontierSignal = {
+    taskId: config.taskId,
+    taskName: taskData.fullName ?? taskData.name ?? config.label,
+    acceptedMetricName: selectedResult.metricName,
+    metricValue: selectedResult.metricValue,
+    selectionRule: config.selectionRule,
+    normalizationStrategy: config.normalizationStrategy,
+    normalizationParams: buildFrontierNormalizationParams(config),
+    normalizedScore: normalizeMetriqSignal(selectedResult.metricValue, config),
+    sourceLabel: selectedResult.sourceLabel,
+    submissionId: selectedResult.submissionId,
+    platformId: selectedResult.platformId,
+    evaluatedAt: selectedResult.evaluatedAtMs ?
+      Timestamp.fromMillis(selectedResult.evaluatedAtMs) :
+      null,
+    attributionStatus: selectedResult.attributionStatus,
+    status: config.signalTier === "production" ? "selected" : "diagnostic",
+    exclusionReason: null,
+    rawSnapshot: selectedResult.rawSnapshot,
+  };
+
+  logger.info("Selected Metriq frontier signal", {
+    taskId: config.taskId,
+    taskKey: config.key,
+    signalTier: config.signalTier,
+    sourceLabel: signal.sourceLabel,
+    metricValue: signal.metricValue,
+    normalizedScore: signal.normalizedScore,
+  });
+
+  return signal;
+}
+
+function buildFrontierNormalizationParams(
+  config: MetriqTaskConfig,
+): FrontierSignal["normalizationParams"] {
+  const params: FrontierSignal["normalizationParams"] = {};
+  if (typeof config.referenceValue === "number") {
+    params.referenceValue = config.referenceValue;
+  }
+  if (typeof config.lowerReference === "number") {
+    params.lowerReference = config.lowerReference;
+  }
+  if (typeof config.upperReference === "number") {
+    params.upperReference = config.upperReference;
+  }
+  return params;
+}
+
+function selectBestMetriqResult(
+  taskData: NonNullable<MetriqTaskResponse["data"]>,
+  config: MetriqTaskConfig,
+  methodology: GlobalMetricsMethodologyDoc,
+) {
+  const taskName = taskData.fullName ?? taskData.name ?? config.label;
+  const results = taskData.results ?? [];
+  if (
+    methodology.include_only_curated_records &&
+    methodology.allowed_task_names.length > 0 &&
+    !isTaskAllowedByMethodology(taskName, config, methodology.allowed_task_names)
+  ) {
+    logger.warn("Skipping Metriq task because it is not included in the methodology allowlist", {
+      taskId: config.taskId,
+      taskName,
+      configLabel: config.label,
+    });
+    return null;
+  }
+
+  const candidates = results.flatMap((result) => {
+    const metricValue = parseMetricNumberFromUnknown(result.metricValue);
+    if (metricValue === null) {
+      return [];
+    }
+
+    const metricName = firstDefinedString(result, ["metricName"]) ?? taskName;
+    if (!metricMatchesTask(metricName, taskName, config)) {
+      return [];
+    }
+
+    const sourceLabel = buildMetriqSourceLabel(result);
+    if (!sourceLabel) {
+      return [];
+    }
+
+    const platformAttribution = extractPlatformAttribution(result);
+    if (
+      methodology.include_only_curated_records &&
+      config.requirePlatformAttribution &&
+      !platformAttribution.isAttributed
+    ) {
+      return [];
+    }
+
+    const comparable = extractMetriqResultComparableFields(result, taskName);
+    if (
+      methodology.include_only_curated_records &&
+      config.requirePlatformAttribution &&
+      methodology.allowed_platform_names.length > 0 &&
+      !matchesCuratedAllowlist(
+        comparable.platformName,
+        comparable.combined,
+        methodology.allowed_platform_names,
+      )
+    ) {
+      return [];
+    }
+
+    if (methodology.reject_theoretical_records && looksTheoreticalRecord(comparable.combined)) {
+      return [];
+    }
+
+    if (!config.allowPaperOnly && !platformAttribution.isAttributed) {
+      return [];
+    }
+
+    const evaluatedAtMs = parseDateMs(result.evaluatedAt) ??
+      parseDateMs(result.updatedAt) ??
+      parseDateMs(result.createdAt) ??
+      0;
+
+    return [{
+      metricValue,
+      metricName,
+      sourceLabel: platformAttribution.displayLabel ?? sourceLabel,
+      submissionId: stringifyNullable(result.submissionId),
+      platformId: stringifyNullable(result.submissionPlatformRefId),
+      evaluatedAtMs,
+      rawSnapshot: sanitizeRecord(result),
+      attributionStatus: platformAttribution.status,
+    }];
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => {
+    if (config.selectionRule === "min") {
+      return left.metricValue - right.metricValue || right.evaluatedAtMs - left.evaluatedAtMs;
+    }
+    return right.metricValue - left.metricValue || right.evaluatedAtMs - left.evaluatedAtMs;
+  });
+
+  return candidates[0];
+}
+
+function buildGlobalMetricsDoc(
+  frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
+  methodology: GlobalMetricsMethodologyDoc,
+  now: Timestamp,
+): GlobalMetricsDoc {
+  const aqSignal = frontierSignals.aq;
+  if (!aqSignal) {
+    throw new HttpStatusError(502, "AQ frontier signal is required to build global metrics");
+  }
+
+  const utilityFrontierPercent = clampPercent(
+    weightedAverage([
+      frontierSignals.aq ? {score: frontierSignals.aq.normalizedScore ?? 0, weight: 0.7} : null,
+      frontierSignals.quantumVolume ? {score: frontierSignals.quantumVolume.normalizedScore ?? 0, weight: 0.3} : null,
+    ]),
+  );
+
+  const faultToleranceBridgePercent = clampPercent(
+    weightedAverage([
+      frontierSignals.logicalErrorRate ? {score: frontierSignals.logicalErrorRate.normalizedScore ?? 0, weight: 0.35} : null,
+      frontierSignals.surfaceCode ? {score: frontierSignals.surfaceCode.normalizedScore ?? 0, weight: 0.30} : null,
+      frontierSignals.faultTolerantQecLogicalErrorRate ?
+        {score: frontierSignals.faultTolerantQecLogicalErrorRate.normalizedScore ?? 0, weight: 0.35} :
+        null,
+    ]),
+  );
+
+  const currentSotaLq = Math.max(
+    1,
+    Math.round(
+      aqSignal.metricValue *
+      (0.5 + 1.5 * (faultToleranceBridgePercent / 100)) *
+      (0.8 + 0.2 * (utilityFrontierPercent / 100)),
+    ),
+  );
+  const requiredLq = methodology.rsa_2048_required_lq;
+  const yearsToLow = computeYearsToQDay(currentSotaLq, requiredLq, methodology.annual_growth_factor_low);
+  const yearsToCentral = computeYearsToQDay(currentSotaLq, requiredLq, methodology.annual_growth_factor_central);
+  const yearsToHigh = computeYearsToQDay(currentSotaLq, requiredLq, methodology.annual_growth_factor_high);
+
+  return {
+    current_sota_lq: currentSotaLq,
+    current_sota_source_label: aqSignal.sourceLabel,
+    current_sota_submission_id: aqSignal.submissionId,
+    current_sota_platform_id: aqSignal.platformId,
+    rsa_2048_required_lq: requiredLq,
+    rsa_2048_delta: Math.max(0, requiredLq - currentSotaLq),
+    rsa_2048_status_percent: requiredLq > 0 ? (currentSotaLq / requiredLq) * 100 : 0,
+    q_day_target_runtime_hours: methodology.q_day_target_runtime_hours,
+    years_to_qday_central: yearsToCentral,
+    years_to_qday_low: yearsToLow,
+    years_to_qday_high: yearsToHigh,
+    q_day_year_central: currentUtcYear() + yearsToCentral,
+    q_day_year_low: currentUtcYear() + yearsToLow,
+    q_day_year_high: currentUtcYear() + yearsToHigh,
+    q_day_estimate_date_central: Timestamp.fromMillis(now.toMillis() + yearsToCentral * 365.25 * 24 * 60 * 60 * 1000),
+    annual_growth_factor_central: methodology.annual_growth_factor_central,
+    annual_growth_factor_low: methodology.annual_growth_factor_low,
+    annual_growth_factor_high: methodology.annual_growth_factor_high,
+    methodology_version: methodology.methodology_version,
+    methodology_note: normalizeGlobalMetricsMethodologyNote(methodology.methodology_note),
+    source: "metriq-curated",
+    source_url: `${METRIQ_API_BASE_URL}/${aqSignal.taskId}`,
+    leader_metric_basis: "effective-logical-qubit-proxy derived from AQ frontier and curated fault-tolerance bridge metrics",
+    composite_readiness_percent: weightedAverage([
+      {score: utilityFrontierPercent, weight: 0.5},
+      {score: faultToleranceBridgePercent, weight: 0.5},
+    ]),
+    utility_frontier_percent: utilityFrontierPercent,
+    fault_tolerance_bridge_percent: faultToleranceBridgePercent,
+    frontier_dependency_version: methodology.methodology_version,
+    frontier_signals: frontierSignals,
+    is_stale: false,
+    stale_after_hours: METRICS_STALE_AFTER_HOURS,
+    selected_record: {
+      isSota: true,
+      sotaValueRaw: String(aqSignal.metricValue),
+      sotaValueParsed: aqSignal.metricValue,
+      title: aqSignal.sourceLabel,
+      platformName: firstDefinedString(aqSignal.rawSnapshot, ["platformName"]) ?? null,
+      taskName: aqSignal.taskName,
+      rawSnapshot: aqSignal.rawSnapshot,
+    },
+    last_successful_sync: now,
+    last_attempted_sync: now,
+  };
+}
+
+function buildGlobalRiskSignalsDoc(
+  frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
+  methodology: GlobalRiskMethodologyDoc,
+  frontier: GlobalMetriqFrontierDoc,
+  now: Timestamp,
+): GlobalRiskSignalsDoc {
+  const utilityFrontier = buildRiskAxis(
+    "Utility Frontier",
+    [
+      frontierSignals.aq ? {signal: frontierSignals.aq, weight: methodology.utilityWeights.aq} : null,
+      frontierSignals.quantumVolume ? {signal: frontierSignals.quantumVolume, weight: methodology.utilityWeights.quantumVolume} : null,
+    ],
+    2,
+  );
+
+  const hardwareScale = buildRiskAxis(
+    "Hardware Scale",
+    [
+      frontierSignals.physicalQubits ? {signal: frontierSignals.physicalQubits, weight: methodology.hardwareScaleWeights.physicalQubits} : null,
+    ],
+    1,
+  );
+
+  const gateQuality = buildRiskAxis(
+    "Gate Quality",
+    [
+      frontierSignals.twoQubitFidelity ? {signal: frontierSignals.twoQubitFidelity, weight: methodology.gateQualityWeights.twoQubitFidelity} : null,
+      frontierSignals.readoutFidelity ? {signal: frontierSignals.readoutFidelity, weight: methodology.gateQualityWeights.readoutFidelity} : null,
+      frontierSignals.coherenceT2 ? {signal: frontierSignals.coherenceT2, weight: methodology.gateQualityWeights.coherenceT2} : null,
+    ],
+    2,
+  );
+
+  const runtimePracticality = buildRiskAxis(
+    "Runtime Practicality",
+    [
+      frontierSignals.singleQubitGateSpeed ? {signal: frontierSignals.singleQubitGateSpeed, weight: methodology.runtimeWeights.singleQubitGateSpeed} : null,
+      frontierSignals.twoQubitGateSpeed ? {signal: frontierSignals.twoQubitGateSpeed, weight: methodology.runtimeWeights.twoQubitGateSpeed} : null,
+    ],
+    2,
+  );
+
+  const faultTolerance = buildRiskAxis(
+    "Fault Tolerance",
+    [
+      frontierSignals.logicalErrorRate ? {signal: frontierSignals.logicalErrorRate, weight: methodology.faultToleranceWeights.errorCorrectionMitigation} : null,
+      frontierSignals.surfaceCode ? {signal: frontierSignals.surfaceCode, weight: methodology.faultToleranceWeights.surfaceCode} : null,
+      frontierSignals.faultTolerantQecLogicalErrorRate ?
+        {signal: frontierSignals.faultTolerantQecLogicalErrorRate, weight: methodology.faultToleranceWeights.faultTolerantQecLogicalErrorRate} :
+        null,
+    ],
+    2,
+  );
+
+  const cryptanalyticRelevance: RiskAxis = {
+    label: "Cryptanalytic Relevance",
+    value: null,
+    status: "unavailable",
+    detail: "No direct production-safe cryptanalytic benchmark currently admitted.",
+    sourceTasks: [],
+  };
+
+  const harvestableShare = methodology.encryptedTrafficShare * (1 - methodology.pqProtectedShare);
+  const cryptanalyticReadinessCore = clampPercent(weightedAverage([
+    utilityFrontier.value !== null ? {score: utilityFrontier.value, weight: methodology.hndlWeights.utilityFrontier} : null,
+    hardwareScale.value !== null ? {score: hardwareScale.value, weight: methodology.hndlWeights.hardwareScale} : null,
+    gateQuality.value !== null ? {score: gateQuality.value, weight: methodology.hndlWeights.gateQuality} : null,
+    runtimePracticality.value !== null ? {score: runtimePracticality.value, weight: methodology.hndlWeights.runtimePracticality} : null,
+    faultTolerance.value !== null ? {score: faultTolerance.value, weight: methodology.hndlWeights.faultTolerance} : null,
+  ]));
+  const hndlPressure = clampPercent(harvestableShare * cryptanalyticReadinessCore);
+  const hndlStatus =
+    hndlPressure >= 60 ? "CRITICAL" :
+      hndlPressure >= 35 ? "HIGH" :
+        hndlPressure >= 15 ? "MEDIUM" :
+          "LOW";
+
+  return {
+    threatMatrixAxes: {
+      utilityFrontier,
+      hardwareScale,
+      gateQuality,
+      runtimePracticality,
+      faultTolerance,
+      cryptanalyticRelevance,
+    },
+    harvestableShare,
+    cryptanalyticReadinessCore,
+    hndlPressure,
+    hndlStatus,
+    methodologyVersion: methodology.methodologyVersion,
+    methodologyNote: methodology.methodologyNote,
+    isStale: frontier.isStale,
+    staleAfterHours: RISK_SIGNALS_STALE_AFTER_HOURS,
+    lastSuccessfulSync: now,
+    lastAttemptedSync: now,
+  };
+}
+
+function buildRiskAxis(
+  label: string,
+  values: Array<{signal: FrontierSignal; weight: number} | null>,
+  minimumDirectCount: number,
+): RiskAxis {
+  const usable = values.filter((value): value is {signal: FrontierSignal; weight: number} => value !== null);
+  if (usable.length === 0) {
+    return {
+      label,
+      value: null,
+      status: "unavailable",
+      detail: "No curated frontier signals are currently available.",
+      sourceTasks: [],
+    };
+  }
+
+  const value = clampPercent(weightedAverage(
+    usable.map((entry) => ({
+      score: entry.signal.normalizedScore ?? 0,
+      weight: entry.weight,
+    })),
+  ));
+
+  return {
+    label,
+    value,
+    status: usable.length >= minimumDirectCount ? "direct" : "modelled",
+    detail: `${usable.length} curated signal${usable.length === 1 ? "" : "s"} contributed to this axis.`,
+    sourceTasks: usable.map((entry) => entry.signal.taskId),
+  };
+}
+
+async function publishGlobalMetriqFrontier(
+  frontier: GlobalMetriqFrontierDoc,
+  reason: "scheduled-sync" | "manual-sync",
+): Promise<void> {
+  const currentRef = db.collection("global").doc("metriq_frontier");
+  const historyRef = db.collection("global_metriq_frontier_history").doc();
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(currentRef);
+    const previous = snapshot.exists ? snapshot.data() as GlobalMetriqFrontierDoc : null;
+    const historyDoc: GlobalMetriqFrontierHistoryDoc = {
+      historyId: historyRef.id,
+      publishedAt: frontier.lastSuccessfulSync,
+      previous,
+      next: frontier,
+      reason,
+    };
+
+    transaction.set(currentRef, frontier);
+    transaction.set(historyRef, historyDoc);
+  });
+}
+
+async function publishGlobalMetrics(
+  metrics: GlobalMetricsDoc,
+  reason: "scheduled-sync" | "manual-sync",
+): Promise<void> {
+  const currentRef = db.collection("global").doc("metrics");
+  const historyRef = db.collection("global_metrics_history").doc();
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(currentRef);
+    const previous = snapshot.exists ? snapshot.data() as GlobalMetricsDoc : null;
+    const historyDoc: GlobalMetricsHistoryDoc = {
+      historyId: historyRef.id,
+      publishedAt: metrics.last_successful_sync,
+      previous,
+      next: metrics,
+      reason,
+    };
+
+    transaction.set(currentRef, metrics);
+    transaction.set(historyRef, historyDoc);
+  });
+}
+
+async function publishGlobalRiskSignals(
+  riskSignals: GlobalRiskSignalsDoc,
+  reason: "scheduled-sync" | "manual-sync",
+): Promise<void> {
+  const currentRef = db.collection("global").doc("risk_signals");
+  const historyRef = db.collection("global_risk_signals_history").doc();
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(currentRef);
+    const previous = snapshot.exists ? snapshot.data() as GlobalRiskSignalsDoc : null;
+    const historyDoc: GlobalRiskSignalsHistoryDoc = {
+      historyId: historyRef.id,
+      publishedAt: riskSignals.lastSuccessfulSync,
+      previous,
+      next: riskSignals,
+      reason,
+    };
+
+    transaction.set(currentRef, riskSignals);
+    transaction.set(historyRef, historyDoc);
+  });
+}
+
+async function markGlobalDocsStale(docIds: string[]): Promise<void> {
+  const now = Timestamp.now();
+  await Promise.all(docIds.map(async (docId) => {
+    const ref = db.collection("global").doc(docId);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) {
+      return;
+    }
+
+    await ref.set({
+      lastAttemptedSync: now,
+      last_attempted_sync: now,
+      isStale: true,
+      is_stale: true,
+      staleAfterHours: docId === "risk_signals" ? RISK_SIGNALS_STALE_AFTER_HOURS : METRICS_STALE_AFTER_HOURS,
+      stale_after_hours: docId === "risk_signals" ? RISK_SIGNALS_STALE_AFTER_HOURS : METRICS_STALE_AFTER_HOURS,
+    }, {merge: true});
+  }));
+}
+
+function computeYearsToQDay(currentSotaLq: number, requiredLq: number, growthFactor: number): number {
+  if (currentSotaLq <= 0) {
+    throw new HttpStatusError(502, "Current SOTA logical qubits must be greater than zero");
+  }
+  if (currentSotaLq >= requiredLq) {
+    return 0;
+  }
+  return Math.log(requiredLq / currentSotaLq) / Math.log(growthFactor);
+}
+
+function parseMetricNumber(value: string): number | null {
+  const normalized = value.replace(/,/g, "").trim();
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseMetricNumberFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return parseMetricNumber(value);
+  }
+  return null;
+}
+
+function firstString(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function firstDefinedString(record: Record<string, unknown>, keys: string[]): string | null {
+  return firstString(record, keys);
+}
+
+function normalizeComparableText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function extractMetriqResultComparableFields(
+  result: Record<string, unknown>,
+  taskName: string,
+) {
+  const titleRaw = firstString(result, ["submissionName", "name", "title"]);
+  const platformNameRaw = firstString(result, ["platformName", "providerName", "platform", "platform_name"]);
+  const methodRaw = firstString(result, ["methodName"]);
+  const notesRaw = firstString(result, ["notes"]);
+  const taskNameRaw = taskName;
+  const title = titleRaw ? normalizeComparableText(titleRaw) : "";
+  const platformName = platformNameRaw ? normalizeComparableText(platformNameRaw) : "";
+  const methodName = methodRaw ? normalizeComparableText(methodRaw) : "";
+  const notes = notesRaw ? normalizeComparableText(notesRaw) : "";
+  const normalizedTaskName = normalizeComparableText(taskNameRaw);
+
+  return {
+    title,
+    titleRaw,
+    platformName,
+    platformNameRaw,
+    taskName: normalizedTaskName,
+    taskNameRaw,
+    combined: [title, platformName, methodName, notes, normalizedTaskName]
+      .filter(Boolean)
+      .join(" "),
+  };
+}
+
+function buildDefaultGlobalMetricsTaskNames(): string[] {
+  return METRIQ_TASK_CONFIGS.map((config) => config.label);
+}
+
+function normalizeAllowedTaskNames(values: string[]): string[] {
+  const deduped = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  if (deduped.length === 0) {
+    return buildDefaultGlobalMetricsTaskNames();
+  }
+
+  if (
+    deduped.length === 1 &&
+    normalizeComparableText(deduped[0]) === "logical qubits"
+  ) {
+    return buildDefaultGlobalMetricsTaskNames();
+  }
+
+  return deduped;
+}
+
+function normalizeGlobalMetricsMethodologyNote(value: string): string {
+  return LEGACY_GLOBAL_METRICS_METHOD_NOTES.has(value) ?
+    DEFAULT_GLOBAL_METRICS_METHOD_NOTE :
+    value;
+}
+
+function matchesCuratedAllowlist(
+  primaryField: string,
+  fallbackField: string,
+  allowlist: string[],
+): boolean {
+  return allowlist
+    .map((entry) => normalizeComparableText(entry))
+    .some((normalizedEntry) =>
+      primaryField.includes(normalizedEntry) ||
+      (!primaryField && fallbackField.includes(normalizedEntry)),
+    );
+}
+
+function isTaskAllowedByMethodology(
+  taskName: string,
+  config: MetriqTaskConfig,
+  allowlist: string[],
+): boolean {
+  const normalizedTaskName = normalizeComparableText(taskName);
+  const normalizedLabel = normalizeComparableText(config.label);
+  return allowlist
+    .map((entry) => normalizeComparableText(entry))
+    .some((entry) =>
+      normalizedTaskName.includes(entry) ||
+      entry.includes(normalizedTaskName) ||
+      normalizedLabel.includes(entry) ||
+      entry.includes(normalizedLabel),
+    );
+}
+
+function metricMatchesTask(metricName: string, taskName: string, config: MetriqTaskConfig): boolean {
+  const normalizedMetric = normalizeComparableText(metricName);
+  const acceptedMetrics = (config.acceptedMetricNames ?? []).map((name) => normalizeComparableText(name));
+  if (acceptedMetrics.length > 0) {
+    return acceptedMetrics.some((accepted) =>
+      normalizedMetric === accepted ||
+      normalizedMetric.includes(accepted) ||
+      accepted.includes(normalizedMetric),
+    );
+  }
+
+  const normalizedTask = normalizeComparableText(taskName);
+  const normalizedLabel = normalizeComparableText(config.label);
+  const normalizedAliases = (config.metricAliases ?? []).map((alias) => normalizeComparableText(alias));
+  return [normalizedTask, normalizedLabel, ...normalizedAliases]
+    .filter(Boolean)
+    .some((candidate) =>
+      normalizedMetric === candidate ||
+      normalizedMetric.includes(candidate) ||
+      candidate.includes(normalizedMetric),
+    );
+}
+
+function looksTheoreticalRecord(value: string): boolean {
+  const markers = [
+    "theoretical",
+    "simulated",
+    "simulation",
+    "idealized",
+    "modeled",
+    "model",
+    "projected",
+    "hypothetical",
+    "estimated",
+  ];
+  return markers.some((marker) => value.includes(marker));
+}
+
+function normalizeMetriqSignal(value: number, config: MetriqTaskConfig): number | null {
+  switch (config.normalizationStrategy) {
+  case "log-upper":
+    return typeof config.referenceValue === "number" ?
+      logNormalizedPercent(value, config.referenceValue) :
+      null;
+  case "linear":
+    return typeof config.lowerReference === "number" && typeof config.upperReference === "number" ?
+      linearNormalizedPercent(value, config.lowerReference, config.upperReference) :
+      null;
+  case "inverse-log":
+    return typeof config.lowerReference === "number" && typeof config.upperReference === "number" ?
+      inverseLogNormalizedPercent(value, config.lowerReference, config.upperReference) :
+      null;
+  case "inverse-linear":
+    return typeof config.lowerReference === "number" && typeof config.upperReference === "number" ?
+      inverseLinearNormalizedPercent(value, config.lowerReference, config.upperReference) :
+      null;
+  default:
+    return null;
+  }
+}
+
+function logNormalizedPercent(value: number, reference: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return clampPercent((Math.log10(1 + value) / Math.log10(1 + reference)) * 100);
+}
+
+function inverseLogNormalizedPercent(value: number, worst: number, best: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  const numerator = Math.log10(worst) - Math.log10(value);
+  const denominator = Math.log10(worst) - Math.log10(best);
+  return clampPercent((numerator / denominator) * 100);
+}
+
+function linearNormalizedPercent(value: number, lower: number, upper: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return clampPercent(((value - lower) / (upper - lower)) * 100);
+}
+
+function inverseLinearNormalizedPercent(value: number, worst: number, best: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return clampPercent(((worst - value) / (worst - best)) * 100);
+}
+
+function weightedAverage(values: Array<{score: number; weight: number} | null>): number {
+  const usable = values.filter((value): value is {score: number; weight: number} => value !== null);
+  const totalWeight = usable.reduce((sum, value) => sum + value.weight, 0);
+  if (totalWeight <= 0) {
+    return 0;
+  }
+  return usable.reduce((sum, value) => sum + value.score * value.weight, 0) / totalWeight;
+}
+
+function stringifyNullable(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function buildMetriqSourceLabel(result: Record<string, unknown>): string | null {
+  const platform = firstString(result, ["platformName", "providerName"]);
+  const submission = firstString(result, ["submissionName", "name", "title"]);
+  if (platform && submission && platform !== submission) {
+    return `${platform}: ${submission}`;
+  }
+  return platform ?? submission ?? firstString(result, ["methodName"]);
+}
+
+function extractPlatformAttribution(result: Record<string, unknown>) {
+  const platformName = firstString(result, ["platformName"]);
+  const providerName = firstString(result, ["providerName"]);
+  const submissionPlatformRefId = stringifyNullable(result.submissionPlatformRefId);
+  const submissionName = firstString(result, ["submissionName", "name", "title"]);
+  const platformLabel = platformName ?? providerName ?? (submissionPlatformRefId ? `platform#${submissionPlatformRefId}` : null);
+  const displayLabel = platformLabel && submissionName && platformLabel !== submissionName ?
+    `${platformLabel}: ${submissionName}` :
+    platformLabel ?? submissionName ?? null;
+
+  const status: FrontierAttributionStatus =
+    platformName ? "direct" :
+      providerName ? "provider-only" :
+        submissionPlatformRefId ? "platform-ref-only" :
+          "unattributed";
+
+  return {
+    isAttributed: Boolean(platformName || providerName || submissionPlatformRefId),
+    displayLabel,
+    status,
+  };
+}
+
+function parseDateMs(value: unknown): number | null {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sanitizeRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
+}
+
+function currentUtcYear(): number {
+  return new Date().getUTCFullYear();
+}
+
 async function getActiveCompanies(): Promise<ParsedCompany[]> {
   const snapshot = await db.collection("companies")
     .where("isActive", "==", true)
@@ -664,11 +2950,11 @@ async function finishRun(
   }, {merge: true});
 }
 
-async function fetchJson<T>(url: string, retries: number): Promise<T> {
+async function fetchJson<T>(url: string, retries: number, init?: RequestInit): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, init);
       if (!response.ok) {
         throw new HttpStatusError(response.status, `Request failed with status ${response.status}`);
       }

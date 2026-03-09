@@ -2,6 +2,31 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /global/metrics {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/metrics_methodology {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/metriq_frontier {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/risk_methodology {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/risk_signals {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /companies/{document} {
       allow read: if true;
       allow write: if false;
@@ -13,6 +38,43 @@ service cloud.firestore {
     }
 
     match /news_feed/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /risk_reference/{document} {
+      allow read, write: if false;
+    }
+
+    match /crypto_reference/{document} {
+      allow read, write: if false;
+    }
+
+    match /crypto_reference_history/{document} {
+      allow read, write: if false;
+    }
+
+    match /global_metrics_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_metrics_methodology_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_metriq_frontier_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_risk_methodology_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_risk_signals_history/{document} {
       allow read: if true;
       allow write: if false;
     }

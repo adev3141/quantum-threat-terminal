@@ -3,17 +3,21 @@
 import { useEffect, useState } from 'react';
 import {
   collection,
+  doc,
   limit,
   onSnapshot,
   orderBy,
   query,
   where,
-  type QuerySnapshot,
   type DocumentData,
+  type QuerySnapshot,
 } from 'firebase/firestore';
-import { getFirestoreInstance, getFirebaseConfigError } from '@/lib/firebase/client';
+import { getFirebaseConfigError, getFirestoreInstance } from '@/lib/firebase/client';
 import type {
   CompanyDoc,
+  GlobalMetriqFrontierDoc,
+  GlobalMetricsDoc,
+  GlobalRiskSignalsDoc,
   MarketSnapshotDoc,
   NewsFeedDoc,
   TerminalDataState,
@@ -23,15 +27,21 @@ const INITIAL_STATE: TerminalDataState = {
   companies: [],
   marketSnapshots: [],
   newsFeed: [],
+  globalMetriqFrontier: null,
+  globalMetrics: null,
+  globalRiskSignals: null,
   loading: true,
   configError: null,
   marketError: null,
   companyError: null,
   newsError: null,
+  globalMetriqFrontierError: null,
+  globalMetricsError: null,
+  globalRiskSignalsError: null,
 };
 
 function mapDocs<T>(snapshot: QuerySnapshot<DocumentData>): T[] {
-  return snapshot.docs.map((doc) => doc.data() as T);
+  return snapshot.docs.map((snapshotDoc) => snapshotDoc.data() as T);
 }
 
 export function useTerminalData() {
@@ -99,7 +109,7 @@ export function useTerminalData() {
         },
       ),
       onSnapshot(
-        query(collection(db, 'news_feed'), orderBy('publishedAt', 'desc'), limit(10)),
+        query(collection(db, 'news_feed'), orderBy('publishedAt', 'desc'), limit(30)),
         (snapshot) => {
           setState((current) => ({
             ...current,
@@ -112,6 +122,60 @@ export function useTerminalData() {
           setState((current) => ({
             ...current,
             newsError: error.message,
+            loading: false,
+          }));
+        },
+      ),
+      onSnapshot(
+        doc(db, 'global', 'metriq_frontier'),
+        (snapshot) => {
+          setState((current) => ({
+            ...current,
+            globalMetriqFrontier: snapshot.exists() ? (snapshot.data() as GlobalMetriqFrontierDoc) : null,
+            globalMetriqFrontierError: null,
+            loading: false,
+          }));
+        },
+        (error) => {
+          setState((current) => ({
+            ...current,
+            globalMetriqFrontierError: error.message,
+            loading: false,
+          }));
+        },
+      ),
+      onSnapshot(
+        doc(db, 'global', 'metrics'),
+        (snapshot) => {
+          setState((current) => ({
+            ...current,
+            globalMetrics: snapshot.exists() ? (snapshot.data() as GlobalMetricsDoc) : null,
+            globalMetricsError: null,
+            loading: false,
+          }));
+        },
+        (error) => {
+          setState((current) => ({
+            ...current,
+            globalMetricsError: error.message,
+            loading: false,
+          }));
+        },
+      ),
+      onSnapshot(
+        doc(db, 'global', 'risk_signals'),
+        (snapshot) => {
+          setState((current) => ({
+            ...current,
+            globalRiskSignals: snapshot.exists() ? (snapshot.data() as GlobalRiskSignalsDoc) : null,
+            globalRiskSignalsError: null,
+            loading: false,
+          }));
+        },
+        (error) => {
+          setState((current) => ({
+            ...current,
+            globalRiskSignalsError: error.message,
             loading: false,
           }));
         },
