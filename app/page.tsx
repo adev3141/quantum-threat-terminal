@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Database, Gauge, Info, TrendingUp, X, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, Database, Gauge, HandCoins, Info, Mail, TrendingUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1688,6 +1688,13 @@ export default function QuantumThreatTerminal() {
               >
                 <Link href="/whitepaper">Whitepaper</Link>
               </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="border-cyan-900 bg-black text-cyan-300 hover:bg-cyan-950/40 hover:text-cyan-200"
+              >
+                <Link href="/contact">Contact</Link>
+              </Button>
               <Badge variant="outline" className={healthStatusClass(coreStatusLabel)}>
                 CORE {coreStatusLabel}
               </Badge>
@@ -2112,6 +2119,75 @@ export default function QuantumThreatTerminal() {
               </CardHeader>
               <CardContent>
                 {newsError ? <TerminalWarning title="News Feed Unavailable" message={newsError} /> : <NewsFeed articles={newsFeed.slice(0, 10)} />}
+              </CardContent>
+            </Card>
+
+            <Card className="border-emerald-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_38%),linear-gradient(180deg,_rgba(6,78,59,0.18),_rgba(0,0,0,0.35))]">
+              <CardHeader>
+                <div className="flex flex-wrap items-center gap-3">
+                  <CardTitle className="flex items-center gap-2 text-emerald-300">
+                    <HandCoins className="h-5 w-5" />
+                    Fund XQBTS
+                  </CardTitle>
+                  <Badge variant="outline" className="border-emerald-700 bg-emerald-700/10 text-emerald-300">
+                    OWNER: 3DDev SMC PVT
+                  </Badge>
+                </div>
+                <CardDescription className="max-w-3xl text-gray-300/80">
+                  Back the product while it is still early: a live quantum-threat terminal with a public
+                  methodology, frontier evidence model, and a clear path to premium intelligence workflows.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                <div>
+                  <p className="max-w-3xl text-sm leading-7 text-gray-200">
+                    Funding helps expand source coverage, ship enterprise-grade reporting and alerting,
+                    and accelerate the commercial buildout of XQBTS Terminal. If you want to back the
+                    roadmap, discuss strategic sponsorship, or open a pilot conversation, use the contact
+                    path below.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Button asChild className="bg-emerald-500 font-mono text-black hover:bg-emerald-400">
+                      <Link href="/contact">Open Contact Page</Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="border-emerald-700 bg-black/60 text-emerald-300 hover:bg-emerald-950/40 hover:text-emerald-200"
+                    >
+                      <a href="mailto:info.3ddev@gmail.com?subject=XQBTS%20Funding%20Inquiry">
+                        <Mail className="h-4 w-4" />
+                        info.3ddev@gmail.com
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="mt-6 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border border-emerald-900/70 bg-black/35 p-4">
+                      <p className="font-mono text-[11px] tracking-[0.18em] text-emerald-300">OWNER</p>
+                      <p className="mt-3 flex items-center gap-2 text-sm leading-6 text-gray-200">
+                        <Building2 className="h-4 w-4 text-emerald-300" />
+                        3DDev SMC PVT
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-900/70 bg-black/35 p-4">
+                      <p className="font-mono text-[11px] tracking-[0.18em] text-emerald-300">FOCUS</p>
+                      <p className="mt-3 text-sm leading-6 text-gray-200">Funding, strategic backing, and pilots</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-900/70 bg-black/35 p-4">
+                      <p className="font-mono text-[11px] tracking-[0.18em] text-emerald-300">WHY NOW</p>
+                      <p className="mt-3 text-sm leading-6 text-gray-200">Live product, differentiated methodology, early category position</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-900/80 bg-black/45 p-5">
+                  <p className="font-mono text-[11px] tracking-[0.18em] text-emerald-300">WHY BACK THIS BUILD</p>
+                  <ul className="mt-4 space-y-3 text-sm leading-7 text-gray-200">
+                    <li>Operationalizes benchmark curation into a real product instead of a static report.</li>
+                    <li>Combines quantum frontier tracking, Q-Day estimation, and HNDL monitoring in one surface.</li>
+                    <li>Creates room for premium enterprise workflows on top of a working public intelligence layer.</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
 

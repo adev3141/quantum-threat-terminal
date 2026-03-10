@@ -283,6 +283,13 @@ export default function WhitepaperPage() {
                   Terminal
                 </Link>
               </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="border-cyan-900 bg-black text-cyan-300 hover:bg-cyan-950/40 hover:text-cyan-200"
+              >
+                <Link href="/contact">Contact</Link>
+              </Button>
               <Badge variant="outline" className="border-emerald-700 bg-emerald-700/10 text-emerald-300">
                 March 9, 2026
               </Badge>
