@@ -8,6 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  EvidenceHealthStripSkeleton,
+  FrontierEvidenceSkeleton,
+  HardwareLeaderboardSkeleton,
+  MarketTickerSkeleton,
+  NewsFeedSkeleton,
+  QDayCountdownSkeleton,
+  RejectedSignalsSkeleton,
+  RsaDeltaSkeleton,
+  ThreatMatrixSkeleton,
+} from '@/components/page-skeletons';
 import { useTerminalData } from '@/hooks/use-terminal-data';
 import type {
   CompanyDoc,
@@ -1599,7 +1610,12 @@ export default function QuantumThreatTerminal() {
     globalMetriqFrontier,
     globalMetrics,
     globalRiskSignals,
-    loading,
+    companyLoading,
+    marketLoading,
+    newsLoading,
+    globalMetriqFrontierLoading,
+    globalMetricsLoading,
+    globalRiskSignalsLoading,
     configError,
     companyError,
     marketError,
@@ -1663,6 +1679,15 @@ export default function QuantumThreatTerminal() {
     globalRiskSignalsError,
   ].filter((value): value is string => Boolean(value));
   const countdown = qDay ? formatCountdown(qDay.countdownYears, qDay.countdownDays) : null;
+  const showMarketTickerSkeleton = marketLoading && !marketError && ticker.length === 0;
+  const showEvidenceHealthSkeleton =
+    (globalMetriqFrontierLoading || globalMetricsLoading || globalRiskSignalsLoading) &&
+    degradedErrors.length === 0;
+  const showQDaySkeleton = globalMetricsLoading && !qDay && !globalMetricsError;
+  const showRiskSkeleton = globalRiskSignalsLoading && !riskAssessment && !globalRiskSignalsError;
+  const showFrontierSkeleton = globalMetriqFrontierLoading && !globalMetriqFrontier && !globalMetriqFrontierError;
+  const showHardwareSkeleton = companyLoading && !companyError && hardwareRows.length === 0;
+  const showNewsSkeleton = newsLoading && !newsError && newsFeed.length === 0;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(17,94,89,0.28),_transparent_45%),linear-gradient(180deg,_#020617,_#000000_38%,_#020617)] text-white">
@@ -1708,7 +1733,13 @@ export default function QuantumThreatTerminal() {
                 {marketLiveLabel}
               </Badge>
             </div>
-            {marketError ? <TerminalWarning title="Market Feed Unavailable" message={marketError} /> : <MarketTicker tickers={ticker} />}
+            {marketError ? (
+              <TerminalWarning title="Market Feed Unavailable" message={marketError} />
+            ) : showMarketTickerSkeleton ? (
+              <MarketTickerSkeleton />
+            ) : (
+              <MarketTicker tickers={ticker} />
+            )}
           </div>
         </div>
       </motion.header>
@@ -1728,129 +1759,145 @@ export default function QuantumThreatTerminal() {
               </p>
             </div>
             <div className="mt-4">
-              <EvidenceHealthStrip health={evidenceHealth} errors={degradedErrors} />
+              {showEvidenceHealthSkeleton ? (
+                <EvidenceHealthStripSkeleton />
+              ) : (
+                <EvidenceHealthStrip health={evidenceHealth} errors={degradedErrors} />
+              )}
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.8fr_0.9fr]">
             <Card className="border-cyan-900 bg-black/40">
               <CardContent className="p-8">
-                <p className="font-mono text-xs tracking-[0.24em] text-gray-500">ESTIMATED Q-DAY COUNTDOWN</p>
-                {qDay && countdown ? (
-                  <>
-                    <ProvenanceLegend
-                      className="mt-5"
-                      items={[
-                        { label: 'MODELLED ESTIMATE', kind: 'modeled' },
-                        { label: 'NORMALIZED INPUT SCORES', kind: 'normalized' },
-                      ]}
-                    />
-                    <div className="mt-6 flex flex-wrap items-end gap-6">
-                      <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.years}</div>
-                      <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.days}</div>
-                    </div>
-                    <p className="mt-6 font-mono text-sm text-gray-500">
-                      Forecast model: years = ln(required LQ / current frontier eLQ) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
-                    </p>
-                    <p className="mt-3 font-mono text-sm text-gray-500">
-                      Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
-                    </p>
-                    <div className="mt-6 grid gap-3 md:grid-cols-3">
-                      <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">COMPOSITE READINESS</p>
-                          <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
-                        </div>
-                        <p className="mt-3 font-mono text-2xl text-white">{qDay.compositeReadinessPercent.toFixed(1)}%</p>
-                      </div>
-                      <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">UTILITY FRONTIER</p>
-                          <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
-                        </div>
-                        <p className="mt-3 font-mono text-2xl text-white">{qDay.utilityFrontierPercent.toFixed(1)}%</p>
-                      </div>
-                      <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">FAULT-TOLERANCE BRIDGE</p>
-                          <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
-                        </div>
-                        <p className="mt-3 font-mono text-2xl text-white">{qDay.faultToleranceBridgePercent.toFixed(1)}%</p>
-                      </div>
-                    </div>
-                    <div className="mt-8 border-t border-cyan-950 pt-8">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Badge variant="outline" className={qDaySeverityClass(qDay.severity)}>
-                          {qDay.severity}
-                        </Badge>
-                        {qDay.isStale ? (
-                          <Badge variant="outline" className="border-amber-500 bg-amber-500/10 text-amber-300">
-                            STALE
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="mt-8 font-mono text-sm text-gray-400">
-                        Last successful sync: {qDay.lastSuccessfulSyncLabel} | Methodology: {qDay.methodologyVersion}
-                      </p>
-                      <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                        Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
-                      </p>
-                      <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                        Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
-                      </p>
-                      <p className="mt-3 max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
-                        {qDay.methodologyNote}
-                      </p>
-                      {globalMetricsError ? (
-                        <p className="mt-3 text-sm text-red-300">Top metrics unavailable: {globalMetricsError}</p>
-                      ) : null}
-                    </div>
-                  </>
+                {showQDaySkeleton ? (
+                  <QDayCountdownSkeleton />
                 ) : (
-                  <div className="mt-6">
-                    <TerminalWarning
-                      title="Top Metrics Unavailable"
-                      message={globalMetricsError ?? 'global/metrics has not been published yet.'}
-                    />
-                  </div>
+                  <>
+                    <p className="font-mono text-xs tracking-[0.24em] text-gray-500">ESTIMATED Q-DAY COUNTDOWN</p>
+                    {qDay && countdown ? (
+                      <>
+                        <ProvenanceLegend
+                          className="mt-5"
+                          items={[
+                            { label: 'MODELLED ESTIMATE', kind: 'modeled' },
+                            { label: 'NORMALIZED INPUT SCORES', kind: 'normalized' },
+                          ]}
+                        />
+                        <div className="mt-6 flex flex-wrap items-end gap-6">
+                          <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.years}</div>
+                          <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.days}</div>
+                        </div>
+                        <p className="mt-6 font-mono text-sm text-gray-500">
+                          Forecast model: years = ln(required LQ / current frontier eLQ) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
+                        </p>
+                        <p className="mt-3 font-mono text-sm text-gray-500">
+                          Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
+                        </p>
+                        <div className="mt-6 grid gap-3 md:grid-cols-3">
+                          <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">COMPOSITE READINESS</p>
+                              <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
+                            </div>
+                            <p className="mt-3 font-mono text-2xl text-white">{qDay.compositeReadinessPercent.toFixed(1)}%</p>
+                          </div>
+                          <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">UTILITY FRONTIER</p>
+                              <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
+                            </div>
+                            <p className="mt-3 font-mono text-2xl text-white">{qDay.utilityFrontierPercent.toFixed(1)}%</p>
+                          </div>
+                          <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">FAULT-TOLERANCE BRIDGE</p>
+                              <Badge variant="outline" className={provenanceBadgeClass('normalized')}>SCORE</Badge>
+                            </div>
+                            <p className="mt-3 font-mono text-2xl text-white">{qDay.faultToleranceBridgePercent.toFixed(1)}%</p>
+                          </div>
+                        </div>
+                        <div className="mt-8 border-t border-cyan-950 pt-8">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Badge variant="outline" className={qDaySeverityClass(qDay.severity)}>
+                              {qDay.severity}
+                            </Badge>
+                            {qDay.isStale ? (
+                              <Badge variant="outline" className="border-amber-500 bg-amber-500/10 text-amber-300">
+                                STALE
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-8 font-mono text-sm text-gray-400">
+                            Last successful sync: {qDay.lastSuccessfulSyncLabel} | Methodology: {qDay.methodologyVersion}
+                          </p>
+                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
+                            Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
+                          </p>
+                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
+                            Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
+                          </p>
+                          <p className="mt-3 max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
+                            {qDay.methodologyNote}
+                          </p>
+                          {globalMetricsError ? (
+                            <p className="mt-3 text-sm text-red-300">Top metrics unavailable: {globalMetricsError}</p>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-6">
+                        <TerminalWarning
+                          title="Top Metrics Unavailable"
+                          message={globalMetricsError ?? 'global/metrics has not been published yet.'}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
 
             <Card className="border-cyan-500/70 bg-cyan-950/35">
               <CardContent className="p-8">
-                <p className="inline-block bg-cyan-400/20 px-2 py-1 font-mono text-xs font-bold tracking-[0.24em] text-cyan-300">
-                  THE RSA-2048 DELTA
-                </p>
-                <ProvenanceLegend
-                  className="mt-5"
-                  items={[
-                    { label: 'MODELLED ESTIMATE', kind: 'modeled' },
-                    { label: 'DIRECT AQ FRONTIER INPUT', kind: 'direct' },
-                  ]}
-                />
-                <div className="mt-8 grid gap-6 md:grid-cols-2">
-                  <div>
-                    <p className="font-mono text-xs tracking-[0.2em] text-gray-400">CURRENT FRONTIER (eLQ PROXY)</p>
-                    <p className="mt-3 font-mono text-5xl font-bold text-cyan-300">{formatIntegerMetric(qDay?.currentLeaderLq ?? null)}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-xs tracking-[0.2em] text-gray-400">DELTA TO RSA BREACH</p>
-                    <p className="mt-3 font-mono text-5xl font-bold text-cyan-300">{formatIntegerMetric(qDay?.deltaToRsaBreach ?? null)}</p>
-                  </div>
-                </div>
-                <p className="mt-8 font-mono text-sm text-gray-400">
-                  REQUIRED: {formatIntegerMetric(qDay?.requiredLogicalQubits ?? null)} LQ | STATUS: {(qDay?.statusPercent ?? 0).toFixed(2)}%
-                </p>
-                <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                  Modeled eLQ proxy based on curated Metriq AQ, quality, scale, and error-correction signals. This is not a direct published logical-qubit count.
-                </p>
-                <div className="mt-4 h-3 overflow-hidden rounded-full border border-cyan-700 bg-black/70">
-                  <div
-                    className="h-full bg-gradient-to-r from-cyan-500 to-cyan-300"
-                    style={{ width: `${Math.min(qDay?.statusPercent ?? 0, 100)}%` }}
-                  />
-                </div>
+                {showQDaySkeleton ? (
+                  <RsaDeltaSkeleton />
+                ) : (
+                  <>
+                    <p className="inline-block bg-cyan-400/20 px-2 py-1 font-mono text-xs font-bold tracking-[0.24em] text-cyan-300">
+                      THE RSA-2048 DELTA
+                    </p>
+                    <ProvenanceLegend
+                      className="mt-5"
+                      items={[
+                        { label: 'MODELLED ESTIMATE', kind: 'modeled' },
+                        { label: 'DIRECT AQ FRONTIER INPUT', kind: 'direct' },
+                      ]}
+                    />
+                    <div className="mt-8 grid gap-6 md:grid-cols-2">
+                      <div>
+                        <p className="font-mono text-xs tracking-[0.2em] text-gray-400">CURRENT FRONTIER (eLQ PROXY)</p>
+                        <p className="mt-3 font-mono text-5xl font-bold text-cyan-300">{formatIntegerMetric(qDay?.currentLeaderLq ?? null)}</p>
+                      </div>
+                      <div>
+                        <p className="font-mono text-xs tracking-[0.2em] text-gray-400">DELTA TO RSA BREACH</p>
+                        <p className="mt-3 font-mono text-5xl font-bold text-cyan-300">{formatIntegerMetric(qDay?.deltaToRsaBreach ?? null)}</p>
+                      </div>
+                    </div>
+                    <p className="mt-8 font-mono text-sm text-gray-400">
+                      REQUIRED: {formatIntegerMetric(qDay?.requiredLogicalQubits ?? null)} LQ | STATUS: {(qDay?.statusPercent ?? 0).toFixed(2)}%
+                    </p>
+                    <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
+                      Modeled eLQ proxy based on curated Metriq AQ, quality, scale, and error-correction signals. This is not a direct published logical-qubit count.
+                    </p>
+                    <div className="mt-4 h-3 overflow-hidden rounded-full border border-cyan-700 bg-black/70">
+                      <div
+                        className="h-full bg-gradient-to-r from-cyan-500 to-cyan-300"
+                        style={{ width: `${Math.min(qDay?.statusPercent ?? 0, 100)}%` }}
+                      />
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1867,7 +1914,9 @@ export default function QuantumThreatTerminal() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {riskAssessment ? (
+                {showRiskSkeleton ? (
+                  <ThreatMatrixSkeleton />
+                ) : riskAssessment ? (
                   <>
                     <ProvenanceLegend
                       className="mb-5"
@@ -2055,7 +2104,11 @@ export default function QuantumThreatTerminal() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <FrontierEvidencePanel frontier={globalMetriqFrontier} error={globalMetriqFrontierError} />
+                {showFrontierSkeleton ? (
+                  <FrontierEvidenceSkeleton />
+                ) : (
+                  <FrontierEvidencePanel frontier={globalMetriqFrontier} error={globalMetriqFrontierError} />
+                )}
               </CardContent>
             </Card>
 
@@ -2070,7 +2123,11 @@ export default function QuantumThreatTerminal() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RejectedSignalsPanel frontier={globalMetriqFrontier} error={globalMetriqFrontierError} />
+                {showFrontierSkeleton ? (
+                  <RejectedSignalsSkeleton />
+                ) : (
+                  <RejectedSignalsPanel frontier={globalMetriqFrontier} error={globalMetriqFrontierError} />
+                )}
               </CardContent>
             </Card>
           </div>
@@ -2102,8 +2159,11 @@ export default function QuantumThreatTerminal() {
               </CardHeader>
               <CardContent>
                 {companyError ? <TerminalWarning title="Company Feed Unavailable" message={companyError} /> : null}
-                {loading && companies.length === 0 ? <p className="font-mono text-sm text-gray-500">LOADING TECHNICAL LEADERBOARD...</p> : null}
-                <HardwareLeaderboard rows={hardwareRows} onInspect={setSelectedAuditRow} />
+                {showHardwareSkeleton ? (
+                  <HardwareLeaderboardSkeleton />
+                ) : (
+                  <HardwareLeaderboard rows={hardwareRows} onInspect={setSelectedAuditRow} />
+                )}
               </CardContent>
             </Card>
 
@@ -2118,7 +2178,13 @@ export default function QuantumThreatTerminal() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {newsError ? <TerminalWarning title="News Feed Unavailable" message={newsError} /> : <NewsFeed articles={newsFeed.slice(0, 10)} />}
+                {newsError ? (
+                  <TerminalWarning title="News Feed Unavailable" message={newsError} />
+                ) : showNewsSkeleton ? (
+                  <NewsFeedSkeleton />
+                ) : (
+                  <NewsFeed articles={newsFeed.slice(0, 10)} />
+                )}
               </CardContent>
             </Card>
 

@@ -222,6 +222,12 @@ export type TerminalDataState = {
   globalMetrics: GlobalMetricsDoc | null;
   globalRiskSignals: GlobalRiskSignalsDoc | null;
   loading: boolean;
+  companyLoading: boolean;
+  marketLoading: boolean;
+  newsLoading: boolean;
+  globalMetriqFrontierLoading: boolean;
+  globalMetricsLoading: boolean;
+  globalRiskSignalsLoading: boolean;
   configError: string | null;
   marketError: string | null;
   companyError: string | null;

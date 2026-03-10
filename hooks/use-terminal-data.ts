@@ -23,6 +23,29 @@ import type {
   TerminalDataState,
 } from '@/lib/types/firestore';
 
+function computeLoadingState(state: TerminalDataState) {
+  return (
+    state.companyLoading ||
+    state.marketLoading ||
+    state.newsLoading ||
+    state.globalMetriqFrontierLoading ||
+    state.globalMetricsLoading ||
+    state.globalRiskSignalsLoading
+  );
+}
+
+function mergeTerminalState(current: TerminalDataState, patch: Partial<TerminalDataState>): TerminalDataState {
+  const nextState = {
+    ...current,
+    ...patch,
+  };
+
+  return {
+    ...nextState,
+    loading: computeLoadingState(nextState),
+  };
+}
+
 const INITIAL_STATE: TerminalDataState = {
   companies: [],
   marketSnapshots: [],
@@ -31,6 +54,12 @@ const INITIAL_STATE: TerminalDataState = {
   globalMetrics: null,
   globalRiskSignals: null,
   loading: true,
+  companyLoading: true,
+  marketLoading: true,
+  newsLoading: true,
+  globalMetriqFrontierLoading: true,
+  globalMetricsLoading: true,
+  globalRiskSignalsLoading: true,
   configError: null,
   marketError: null,
   companyError: null,
@@ -53,9 +82,14 @@ export function useTerminalData() {
   useEffect(() => {
     const configError = getFirebaseConfigError();
     if (configError) {
-      setState((current) => ({
-        ...current,
+      setState((current) => mergeTerminalState(current, {
         configError,
+        companyLoading: false,
+        marketLoading: false,
+        newsLoading: false,
+        globalMetriqFrontierLoading: false,
+        globalMetricsLoading: false,
+        globalRiskSignalsLoading: false,
         loading: false,
       }));
       return;
@@ -63,9 +97,14 @@ export function useTerminalData() {
 
     const db = getFirestoreInstance();
     if (!db) {
-      setState((current) => ({
-        ...current,
+      setState((current) => mergeTerminalState(current, {
         configError: 'Firebase app failed to initialize.',
+        companyLoading: false,
+        marketLoading: false,
+        newsLoading: false,
+        globalMetriqFrontierLoading: false,
+        globalMetricsLoading: false,
+        globalRiskSignalsLoading: false,
         loading: false,
       }));
       return;
@@ -75,108 +114,96 @@ export function useTerminalData() {
       onSnapshot(
         query(collection(db, 'companies'), where('isActive', '==', true), orderBy('displayOrder', 'asc'), limit(50)),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             companies: mapDocs<CompanyDoc>(snapshot),
             companyError: null,
-            loading: false,
+            companyLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             companyError: error.message,
-            loading: false,
+            companyLoading: false,
           }));
         },
       ),
       onSnapshot(
         query(collection(db, 'market_snapshots')),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             marketSnapshots: mapDocs<MarketSnapshotDoc>(snapshot),
             marketError: null,
-            loading: false,
+            marketLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             marketError: error.message,
-            loading: false,
+            marketLoading: false,
           }));
         },
       ),
       onSnapshot(
         query(collection(db, 'news_feed'), orderBy('publishedAt', 'desc'), limit(30)),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             newsFeed: mapDocs<NewsFeedDoc>(snapshot),
             newsError: null,
-            loading: false,
+            newsLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             newsError: error.message,
-            loading: false,
+            newsLoading: false,
           }));
         },
       ),
       onSnapshot(
         doc(db, 'global', 'metriq_frontier'),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalMetriqFrontier: snapshot.exists() ? (snapshot.data() as GlobalMetriqFrontierDoc) : null,
             globalMetriqFrontierError: null,
-            loading: false,
+            globalMetriqFrontierLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalMetriqFrontierError: error.message,
-            loading: false,
+            globalMetriqFrontierLoading: false,
           }));
         },
       ),
       onSnapshot(
         doc(db, 'global', 'metrics'),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalMetrics: snapshot.exists() ? (snapshot.data() as GlobalMetricsDoc) : null,
             globalMetricsError: null,
-            loading: false,
+            globalMetricsLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalMetricsError: error.message,
-            loading: false,
+            globalMetricsLoading: false,
           }));
         },
       ),
       onSnapshot(
         doc(db, 'global', 'risk_signals'),
         (snapshot) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalRiskSignals: snapshot.exists() ? (snapshot.data() as GlobalRiskSignalsDoc) : null,
             globalRiskSignalsError: null,
-            loading: false,
+            globalRiskSignalsLoading: false,
           }));
         },
         (error) => {
-          setState((current) => ({
-            ...current,
+          setState((current) => mergeTerminalState(current, {
             globalRiskSignalsError: error.message,
-            loading: false,
+            globalRiskSignalsLoading: false,
           }));
         },
       ),
