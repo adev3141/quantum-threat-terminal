@@ -1774,7 +1774,7 @@ export default function QuantumThreatTerminal() {
                   <QDayCountdownSkeleton />
                 ) : (
                   <>
-                    <p className="font-mono text-xs tracking-[0.24em] text-gray-500">ESTIMATED Q-DAY COUNTDOWN</p>
+                    <p className="font-mono text-xs tracking-[0.24em] text-gray-500">READINESS PROJECTION</p>
                     {qDay && countdown ? (
                       <>
                         <ProvenanceLegend
@@ -1789,7 +1789,7 @@ export default function QuantumThreatTerminal() {
                           <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.days}</div>
                         </div>
                         <p className="mt-6 font-mono text-sm text-gray-500">
-                          Forecast model: years = ln(required LQ / current frontier eLQ) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
+                          Forecast model: years = ln(required readiness threshold / current frontier proxy) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
                         </p>
                         <p className="mt-3 font-mono text-sm text-gray-500">
                           Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
@@ -1865,13 +1865,13 @@ export default function QuantumThreatTerminal() {
                 ) : (
                   <>
                     <p className="inline-block bg-cyan-400/20 px-2 py-1 font-mono text-xs font-bold tracking-[0.24em] text-cyan-300">
-                      THE RSA-2048 DELTA
+                      CRYPTOGRAPHIC RISK GAP (MODELLED)
                     </p>
                     <ProvenanceLegend
                       className="mt-5"
                       items={[
                         { label: 'MODELLED ESTIMATE', kind: 'modeled' },
-                        { label: 'DIRECT AQ FRONTIER INPUT', kind: 'direct' },
+                        { label: 'DIRECT BENCHMARK-FAMILY INPUT', kind: 'direct' },
                       ]}
                     />
                     <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -1888,7 +1888,7 @@ export default function QuantumThreatTerminal() {
                       REQUIRED: {formatIntegerMetric(qDay?.requiredLogicalQubits ?? null)} LQ | STATUS: {(qDay?.statusPercent ?? 0).toFixed(2)}%
                     </p>
                     <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                      Modeled eLQ proxy based on curated Metriq AQ, quality, scale, and error-correction signals. This is not a direct published logical-qubit count.
+                      Modeled readiness proxy based on curated benchmark-family quality, scale, throughput, and error-correction signals. This is not a direct published logical-qubit count.
                     </p>
                     <div className="mt-4 h-3 overflow-hidden rounded-full border border-cyan-700 bg-black/70">
                       <div
@@ -2097,10 +2097,10 @@ export default function QuantumThreatTerminal() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-cyan-300">
                   <Database className="h-5 w-5" />
-                  FRONTIER EVIDENCE
+                  BENCHMARK EVIDENCE
                 </CardTitle>
                 <CardDescription className="text-gray-500">
-                  Admitted production-safe benchmark signals currently feeding the core frontier, Q-Day, and HNDL outputs.
+                  Admitted benchmark-family evidence currently feeding readiness projection, threat modeling, and HNDL outputs.
                 </CardDescription>
               </CardHeader>
               <CardContent>
