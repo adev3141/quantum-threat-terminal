@@ -24,9 +24,10 @@ const gnewsApiKey = defineSecret("GNEWS_API_KEY");
 const adminTriggerKey = defineSecret("ADMIN_TRIGGER_KEY");
 const XML_PATH = join(__dirname, "../src/data/quantum_companies.xml");
 const GNEWS_BATCH_SIZE = 2;
-const METRIQ_API_BASE_URL = "https://metriq.info/api/task";
-const METRICS_STALE_AFTER_HOURS = 36;
-const RISK_SIGNALS_STALE_AFTER_HOURS = 36;
+const METRIQ_BENCHMARK_LATEST_URL = "https://unitaryfoundation.github.io/metriq-data/benchmark.latest.json";
+const METRIQ_PLATFORMS_INDEX_URL = "https://unitaryfoundation.github.io/metriq-data/platforms/index.json";
+const METRICS_STALE_AFTER_HOURS = 18;
+const RISK_SIGNALS_STALE_AFTER_HOURS = 18;
 const DEFAULT_GLOBAL_METRICS_METHOD_NOTE =
   "Composite RSA-2048 readiness model using curated Metriq AQ, error-correction, quality, and scale frontier tasks.";
 const LEGACY_GLOBAL_METRICS_METHOD_NOTES = new Set([
@@ -267,6 +268,23 @@ const METRIQ_TASK_CONFIGS: MetriqTaskConfig[] = [
   },
 ];
 
+const BENCHMARK_FAMILY_BY_TASK: Partial<Record<MetriqTaskKey, string[]>> = {
+  aq: ["wit", "bseq", "qml_kernel", "lr_qaoa"],
+  physicalQubits: [],
+  twoQubitFidelity: ["eplg", "mirror_circuits"],
+  logicalErrorRate: ["eplg"],
+  surfaceCode: ["qedc_benchmarks"],
+  readoutFidelity: ["mirror_circuits"],
+  coherenceT2: ["mirror_circuits"],
+  quantumVolume: ["bseq", "wit"],
+  faultTolerantQecLogicalErrorRate: ["qedc_benchmarks", "eplg"],
+  singleQubitGateSpeed: ["clops"],
+  twoQubitGateSpeed: ["clops"],
+  qecDecoding: ["qedc_benchmarks"],
+  shorOrderFinding: ["qedc_benchmarks"],
+  integerFactoring: ["qedc_benchmarks"],
+};
+
 type CompanyDoc = {
   symbol: string;
   name: string;
@@ -444,24 +462,34 @@ type GlobalMetricsMethodologyHistoryDoc = {
   reason: string;
 };
 
-type MetriqTaskResult = Record<string, unknown> & {
-  metricValue?: string | number;
-  metricName?: string;
-  isHigherBetter?: boolean;
-  submissionName?: string;
-  platformName?: string;
-  providerName?: string;
-  submissionId?: string | number;
-  submissionPlatformRefId?: string | number;
+type MetriqBenchmarkRow = Record<string, unknown> & {
+  provider?: string;
+  device?: string;
+  timestamp?: string;
+  results?: Record<string, unknown>;
+  errors?: Record<string, unknown>;
+  directions?: Record<string, unknown>;
+  params?: Record<string, unknown>;
+  suite_id?: string;
+  app_version?: string;
+  job_type?: string;
 };
 
-type MetriqTaskResponse = {
-  data?: {
-    id?: number;
-    name?: string;
-    fullName?: string;
-    results?: MetriqTaskResult[];
-  };
+type BenchmarkSignalCandidate = {
+  metricValue: number;
+  metricName: string;
+  sourceLabel: string;
+  evaluatedAtMs: number;
+  rawSnapshot: Record<string, unknown>;
+  attributionStatus: FrontierAttributionStatus;
+  platformId: string | null;
+  submissionId: string | null;
+};
+
+type MetriqPlatformIndexEntry = Record<string, unknown> & {
+  provider?: string;
+  device?: string;
+  current?: Record<string, unknown>;
 };
 
 type GlobalMetricsSelectedRecord = {
@@ -1111,7 +1139,7 @@ export const updateGlobalRiskMethodology = onRequest(
 
 export const syncMetriqMetrics = onSchedule(
   {
-    schedule: "every 24 hours",
+    schedule: "every 6 hours",
     region: "us-central1",
   },
   async () => {
@@ -2086,12 +2114,14 @@ async function fetchMetriqFrontierData(
   const productionSignals: Partial<Record<MetriqTaskKey, FrontierSignal>> = {};
   const diagnosticSignals: Partial<Record<MetriqTaskKey, FrontierSignal>> = {};
   const excludedSignals: FrontierExclusion[] = [];
+  const benchmarkRows = await fetchBenchmarkRows();
+  const platformsIndex = await fetchPlatformsIndex();
 
   for (const config of METRIQ_TASK_CONFIGS) {
     stats.tasksFetched += 1;
 
     try {
-      const signal = await fetchMetriqTaskSignal(config, methodology);
+      const signal = fetchMetriqTaskSignal(config, methodology, benchmarkRows, platformsIndex);
       if (!signal) {
         excludedSignals.push({
           taskId: config.taskId,
@@ -2131,13 +2161,31 @@ async function fetchMetriqFrontierData(
     }
   }
 
+  if (!productionSignals.aq) {
+    const synthesizedAq = synthesizeAqSignalFromCoverage(productionSignals, methodology, benchmarkRows);
+    if (synthesizedAq) {
+      productionSignals.aq = synthesizedAq;
+      stats.productionSignalsSelected += 1;
+      stats.tasksSucceeded += 1;
+    } else {
+      excludedSignals.push({
+        taskId: 128,
+        taskKey: "aq",
+        taskName: "Algorithmic Qubits",
+        signalTier: "production",
+        required: true,
+        reason: "Unable to synthesize AQ proxy from benchmark-family evidence.",
+      });
+    }
+  }
+
   return {
     productionSignals,
     diagnosticSignals,
     excludedSignals,
     methodologyVersion: methodology.methodology_version,
     source: "metriq-curated",
-    sourceUrlBase: METRIQ_API_BASE_URL,
+    sourceUrlBase: METRIQ_BENCHMARK_LATEST_URL,
     lastSuccessfulSync: now,
     lastAttemptedSync: now,
     isStale: false,
@@ -2145,32 +2193,20 @@ async function fetchMetriqFrontierData(
   };
 }
 
-async function fetchMetriqTaskSignal(
+function fetchMetriqTaskSignal(
   config: MetriqTaskConfig,
   methodology: GlobalMetricsMethodologyDoc,
-): Promise<FrontierSignal | null> {
-  const response = await fetchJson<MetriqTaskResponse>(
-    `${METRIQ_API_BASE_URL}/${config.taskId}`,
-    1,
-    {
-      headers: {
-        Accept: "application/json",
-      },
-    },
-  );
-  const taskData = response.data;
-  if (!taskData || !Array.isArray(taskData.results)) {
-    throw new HttpStatusError(502, `Metriq task ${config.taskId} response was missing results[]`);
-  }
-
-  const selectedResult = selectBestMetriqResult(taskData, config, methodology);
+  benchmarkRows: MetriqBenchmarkRow[],
+  platformsIndex: MetriqPlatformIndexEntry[],
+): FrontierSignal | null {
+  const selectedResult = selectBestBenchmarkResult(config, methodology, benchmarkRows, platformsIndex);
   if (!selectedResult) {
     return null;
   }
 
   const signal: FrontierSignal = {
     taskId: config.taskId,
-    taskName: taskData.fullName ?? taskData.name ?? config.label,
+    taskName: config.label,
     acceptedMetricName: selectedResult.metricName,
     metricValue: selectedResult.metricValue,
     selectionRule: config.selectionRule,
@@ -2217,88 +2253,83 @@ function buildFrontierNormalizationParams(
   return params;
 }
 
-function selectBestMetriqResult(
-  taskData: NonNullable<MetriqTaskResponse["data"]>,
+function selectBestBenchmarkResult(
   config: MetriqTaskConfig,
   methodology: GlobalMetricsMethodologyDoc,
-) {
-  const taskName = taskData.fullName ?? taskData.name ?? config.label;
-  const results = taskData.results ?? [];
+  benchmarkRows: MetriqBenchmarkRow[],
+  platformsIndex: MetriqPlatformIndexEntry[],
+): BenchmarkSignalCandidate | null {
   if (
     methodology.include_only_curated_records &&
     methodology.allowed_task_names.length > 0 &&
-    !isTaskAllowedByMethodology(taskName, config, methodology.allowed_task_names)
+    !isTaskAllowedByMethodology(config.label, config, methodology.allowed_task_names)
   ) {
-    logger.warn("Skipping Metriq task because it is not included in the methodology allowlist", {
-      taskId: config.taskId,
-      taskName,
-      configLabel: config.label,
-    });
     return null;
   }
 
-  const candidates = results.flatMap((result) => {
-    const metricValue = parseMetricNumberFromUnknown(result.metricValue);
-    if (metricValue === null) {
+  if (config.key === "physicalQubits") {
+    return selectPhysicalQubitsCandidate(config, methodology, platformsIndex);
+  }
+
+  const candidates = benchmarkRows.flatMap((row) => {
+    const benchmarkName = getBenchmarkName(row);
+    if (!isBenchmarkFamilyAllowed(config, benchmarkName)) {
       return [];
     }
 
-    const metricName = firstDefinedString(result, ["metricName"]) ?? taskName;
-    if (!metricMatchesTask(metricName, taskName, config)) {
-      return [];
-    }
-
-    const sourceLabel = buildMetriqSourceLabel(result);
-    if (!sourceLabel) {
-      return [];
-    }
-
-    const platformAttribution = extractPlatformAttribution(result);
+    const results = (row.results && typeof row.results === "object") ? row.results : {};
+    const provider = stringifyNullable(row.provider) ?? "unknown-provider";
+    const device = stringifyNullable(row.device) ?? "unknown-device";
+    const sourceLabel = `${provider} / ${device}`;
+    const comparable = `${sourceLabel} ${benchmarkName}`;
     if (
       methodology.include_only_curated_records &&
-      config.requirePlatformAttribution &&
-      !platformAttribution.isAttributed
-    ) {
-      return [];
-    }
-
-    const comparable = extractMetriqResultComparableFields(result, taskName);
-    if (
-      methodology.include_only_curated_records &&
-      config.requirePlatformAttribution &&
       methodology.allowed_platform_names.length > 0 &&
-      !matchesCuratedAllowlist(
-        comparable.platformName,
-        comparable.combined,
-        methodology.allowed_platform_names,
-      )
+      !matchesCuratedAllowlist(device, comparable, methodology.allowed_platform_names)
     ) {
       return [];
     }
-
-    if (methodology.reject_theoretical_records && looksTheoreticalRecord(comparable.combined)) {
+    if (methodology.reject_theoretical_records && looksTheoreticalRecord(comparable.toLowerCase())) {
       return [];
     }
 
-    if (!config.allowPaperOnly && !platformAttribution.isAttributed) {
-      return [];
+    const metricCandidates: BenchmarkSignalCandidate[] = [];
+    for (const [metricName, raw] of Object.entries(results)) {
+      const rawMetricValue = parseMetricNumberFromUnknown(raw);
+      if (rawMetricValue === null) {
+        continue;
+      }
+      const metricValue = adjustMetricValueForTask(config, metricName, rawMetricValue);
+      if (metricValue === null) {
+        continue;
+      }
+      if (!metricMatchesTask(metricName, benchmarkName, config) &&
+        !matchesRelaxedTaskMetric(config.key, metricName, benchmarkName)) {
+        continue;
+      }
+      const evaluatedAtMs = parseDateMs(row.timestamp);
+      if (evaluatedAtMs === null) {
+        continue;
+      }
+      const isAttributed = provider !== "unknown-provider" && device !== "unknown-device";
+      if (config.requirePlatformAttribution && !isAttributed) {
+        continue;
+      }
+      if (!config.allowPaperOnly && !isAttributed) {
+        continue;
+      }
+      metricCandidates.push({
+        metricName,
+        metricValue,
+        sourceLabel,
+        evaluatedAtMs,
+        rawSnapshot: sanitizeRecord(row),
+        attributionStatus: isAttributed ? "direct" : "provider-only",
+        platformId: isAttributed ? `${provider}:${device}` : null,
+        submissionId: stringifyNullable(row.suite_id) ?? stringifyNullable(row.app_version),
+      });
     }
-
-    const evaluatedAtMs = parseDateMs(result.evaluatedAt) ??
-      parseDateMs(result.updatedAt) ??
-      parseDateMs(result.createdAt) ??
-      0;
-
-    return [{
-      metricValue,
-      metricName,
-      sourceLabel: platformAttribution.displayLabel ?? sourceLabel,
-      submissionId: stringifyNullable(result.submissionId),
-      platformId: stringifyNullable(result.submissionPlatformRefId),
-      evaluatedAtMs,
-      rawSnapshot: sanitizeRecord(result),
-      attributionStatus: platformAttribution.status,
-    }];
+    return metricCandidates;
   });
 
   if (candidates.length === 0) {
@@ -2315,12 +2346,162 @@ function selectBestMetriqResult(
   return candidates[0];
 }
 
+async function fetchBenchmarkRows(): Promise<MetriqBenchmarkRow[]> {
+  const rows = await fetchJson<unknown[]>(METRIQ_BENCHMARK_LATEST_URL, 2, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!Array.isArray(rows)) {
+    throw new HttpStatusError(502, "benchmark.latest.json did not return an array");
+  }
+  return rows.filter((row): row is MetriqBenchmarkRow => Boolean(row && typeof row === "object"));
+}
+
+async function fetchPlatformsIndex(): Promise<MetriqPlatformIndexEntry[]> {
+  const payload = await fetchJson<unknown>(METRIQ_PLATFORMS_INDEX_URL, 2, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (Array.isArray(payload)) {
+    return payload.filter((row): row is MetriqPlatformIndexEntry => Boolean(row && typeof row === "object"));
+  }
+  if (payload && typeof payload === "object") {
+    const wrappedRows = firstDefinedRecordArray(payload as Record<string, unknown>, ["platforms", "data", "rows"]);
+    return wrappedRows;
+  }
+  return [];
+}
+
+function firstDefinedRecordArray(record: Record<string, unknown>, keys: string[]): MetriqPlatformIndexEntry[] {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value.filter((entry): entry is MetriqPlatformIndexEntry => Boolean(entry && typeof entry === "object"));
+    }
+  }
+  return [];
+}
+
+function selectPhysicalQubitsCandidate(
+  config: MetriqTaskConfig,
+  methodology: GlobalMetricsMethodologyDoc,
+  platformsIndex: MetriqPlatformIndexEntry[],
+): BenchmarkSignalCandidate | null {
+  const candidates = platformsIndex.flatMap((entry) => {
+    const provider = stringifyNullable(entry.provider) ?? "unknown-provider";
+    const device = stringifyNullable(entry.device) ?? "unknown-device";
+    const comparable = `${provider} ${device}`.toLowerCase();
+    if (
+      methodology.include_only_curated_records &&
+      methodology.allowed_platform_names.length > 0 &&
+      !matchesCuratedAllowlist(device.toLowerCase(), comparable, methodology.allowed_platform_names)
+    ) {
+      return [];
+    }
+
+    const current = entry.current && typeof entry.current === "object" ? entry.current : {};
+    const metricValue =
+      parseMetricNumberFromUnknown((current as Record<string, unknown>).qubits) ??
+      parseMetricNumberFromUnknown((current as Record<string, unknown>).num_qubits) ??
+      parseMetricNumberFromUnknown((current as Record<string, unknown>).physical_qubits);
+    if (metricValue === null) {
+      return [];
+    }
+    const isAttributed = provider !== "unknown-provider" && device !== "unknown-device";
+    const attributionStatus: FrontierAttributionStatus = isAttributed ? "direct" : "provider-only";
+    if (config.requirePlatformAttribution && !isAttributed) {
+      return [];
+    }
+    return [{
+      metricName: "physical_qubits",
+      metricValue,
+      sourceLabel: `${provider} / ${device}`,
+      evaluatedAtMs: Date.now(),
+      rawSnapshot: sanitizeRecord(entry),
+      attributionStatus,
+      platformId: isAttributed ? `${provider}:${device}` : null,
+      submissionId: stringifyNullable((current as Record<string, unknown>).timestamp),
+    }];
+  });
+  if (candidates.length === 0) {
+    return null;
+  }
+  candidates.sort((left, right) => right.metricValue - left.metricValue);
+  return candidates[0];
+}
+
+function getBenchmarkName(row: MetriqBenchmarkRow): string {
+  const paramsBenchmark = row.params && typeof row.params === "object" ?
+    stringifyNullable((row.params as Record<string, unknown>).benchmark_name) :
+    null;
+  return (paramsBenchmark ?? stringifyNullable(row.job_type) ?? "unknown").toLowerCase();
+}
+
+function isBenchmarkFamilyAllowed(config: MetriqTaskConfig, benchmarkName: string): boolean {
+  const families = BENCHMARK_FAMILY_BY_TASK[config.key];
+  if (!families || families.length === 0) {
+    return true;
+  }
+  return families.some((family) => benchmarkName.includes(family));
+}
+
+function synthesizeAqSignalFromCoverage(
+  frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
+  methodology: GlobalMetricsMethodologyDoc,
+  benchmarkRows: MetriqBenchmarkRow[],
+): FrontierSignal | null {
+  const aqConfig = METRIQ_TASK_CONFIGS.find((entry) => entry.key === "aq");
+  if (!aqConfig) {
+    return null;
+  }
+  const usable = [
+    frontierSignals.quantumVolume?.normalizedScore,
+    frontierSignals.physicalQubits?.normalizedScore,
+    frontierSignals.twoQubitFidelity?.normalizedScore,
+    frontierSignals.readoutFidelity?.normalizedScore,
+    frontierSignals.logicalErrorRate?.normalizedScore,
+  ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (usable.length < 1) {
+    return null;
+  }
+  const normalizedProxy = clampPercent(usable.reduce((sum, value) => sum + value, 0) / usable.length);
+  const aqProxy = Math.max(1, Math.round((normalizedProxy / 100) * 256));
+  const newestMs = benchmarkRows
+    .map((row) => parseDateMs(row.timestamp) ?? 0)
+    .reduce((max, value) => Math.max(max, value), 0);
+  return {
+    taskId: 128,
+    taskName: "Algorithmic Qubits (benchmark-family proxy)",
+    acceptedMetricName: "aq_proxy",
+    metricValue: aqProxy,
+    selectionRule: "max",
+    normalizationStrategy: "log-upper",
+    normalizationParams: {
+      referenceValue: 256,
+    },
+    normalizedScore: normalizeMetriqSignal(aqProxy, aqConfig),
+    sourceLabel: "Benchmark-family synthesized proxy (coverage-gated)",
+    submissionId: methodology.methodology_version,
+    platformId: "benchmark-family",
+    evaluatedAt: newestMs > 0 ? Timestamp.fromMillis(newestMs) : null,
+    attributionStatus: "provider-only",
+    status: "selected",
+    exclusionReason: null,
+    rawSnapshot: {
+      normalizedProxy,
+      source: METRIQ_BENCHMARK_LATEST_URL,
+    },
+  };
+}
+
 function buildGlobalMetricsDoc(
   frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
   methodology: GlobalMetricsMethodologyDoc,
   now: Timestamp,
 ): GlobalMetricsDoc {
-  const aqSignal = frontierSignals.aq;
+  const aqSignal = frontierSignals.aq ?? deriveAqSignalForMetrics(frontierSignals, now);
   if (!aqSignal) {
     throw new HttpStatusError(502, "AQ frontier signal is required to build global metrics");
   }
@@ -2377,7 +2558,7 @@ function buildGlobalMetricsDoc(
     methodology_version: methodology.methodology_version,
     methodology_note: normalizeGlobalMetricsMethodologyNote(methodology.methodology_note),
     source: "metriq-curated",
-    source_url: `${METRIQ_API_BASE_URL}/${aqSignal.taskId}`,
+    source_url: METRIQ_BENCHMARK_LATEST_URL,
     leader_metric_basis: "effective-logical-qubit-proxy derived from AQ frontier and curated fault-tolerance bridge metrics",
     composite_readiness_percent: weightedAverage([
       {score: utilityFrontierPercent, weight: 0.5},
@@ -2400,6 +2581,45 @@ function buildGlobalMetricsDoc(
     },
     last_successful_sync: now,
     last_attempted_sync: now,
+  };
+}
+
+function deriveAqSignalForMetrics(
+  frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
+  now: Timestamp,
+): FrontierSignal | null {
+  const normalizedSignals = Object.values(frontierSignals)
+    .filter((entry): entry is FrontierSignal => Boolean(entry))
+    .filter((entry) => typeof entry.normalizedScore === "number" && Number.isFinite(entry.normalizedScore));
+  if (normalizedSignals.length === 0) {
+    return null;
+  }
+  const avg = clampPercent(
+    normalizedSignals.reduce((sum, entry) => sum + (entry.normalizedScore ?? 0), 0) / normalizedSignals.length,
+  );
+  const aqProxy = Math.max(1, Math.round((avg / 100) * 256));
+  return {
+    taskId: 128,
+    taskName: "Algorithmic Qubits (global fallback proxy)",
+    acceptedMetricName: "aq_proxy_fallback",
+    metricValue: aqProxy,
+    selectionRule: "max",
+    normalizationStrategy: "log-upper",
+    normalizationParams: {
+      referenceValue: 256,
+    },
+    normalizedScore: logNormalizedPercent(aqProxy, 256),
+    sourceLabel: "Synthesized from available normalized benchmark frontier signals",
+    submissionId: "aq-proxy-fallback",
+    platformId: "benchmark-family",
+    evaluatedAt: now,
+    attributionStatus: "provider-only",
+    status: "selected",
+    exclusionReason: null,
+    rawSnapshot: {
+      derivedFromSignals: normalizedSignals.map((entry) => entry.taskName),
+      normalizedAverage: avg,
+    },
   };
 }
 
@@ -2670,34 +2890,6 @@ function normalizeComparableText(value: string): string {
     .trim();
 }
 
-function extractMetriqResultComparableFields(
-  result: Record<string, unknown>,
-  taskName: string,
-) {
-  const titleRaw = firstString(result, ["submissionName", "name", "title"]);
-  const platformNameRaw = firstString(result, ["platformName", "providerName", "platform", "platform_name"]);
-  const methodRaw = firstString(result, ["methodName"]);
-  const notesRaw = firstString(result, ["notes"]);
-  const taskNameRaw = taskName;
-  const title = titleRaw ? normalizeComparableText(titleRaw) : "";
-  const platformName = platformNameRaw ? normalizeComparableText(platformNameRaw) : "";
-  const methodName = methodRaw ? normalizeComparableText(methodRaw) : "";
-  const notes = notesRaw ? normalizeComparableText(notesRaw) : "";
-  const normalizedTaskName = normalizeComparableText(taskNameRaw);
-
-  return {
-    title,
-    titleRaw,
-    platformName,
-    platformNameRaw,
-    taskName: normalizedTaskName,
-    taskNameRaw,
-    combined: [title, platformName, methodName, notes, normalizedTaskName]
-      .filter(Boolean)
-      .join(" "),
-  };
-}
-
 function buildDefaultGlobalMetricsTaskNames(): string[] {
   return METRIQ_TASK_CONFIGS.map((config) => config.label);
 }
@@ -2758,11 +2950,14 @@ function metricMatchesTask(metricName: string, taskName: string, config: MetriqT
   const normalizedMetric = normalizeComparableText(metricName);
   const acceptedMetrics = (config.acceptedMetricNames ?? []).map((name) => normalizeComparableText(name));
   if (acceptedMetrics.length > 0) {
-    return acceptedMetrics.some((accepted) =>
+    const acceptedMatch = acceptedMetrics.some((accepted) =>
       normalizedMetric === accepted ||
       normalizedMetric.includes(accepted) ||
       accepted.includes(normalizedMetric),
     );
+    if (acceptedMatch) {
+      return true;
+    }
   }
 
   const normalizedTask = normalizeComparableText(taskName);
@@ -2775,6 +2970,49 @@ function metricMatchesTask(metricName: string, taskName: string, config: MetriqT
       normalizedMetric.includes(candidate) ||
       candidate.includes(normalizedMetric),
     );
+}
+
+function adjustMetricValueForTask(config: MetriqTaskConfig, metricName: string, value: number): number | null {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const normalizedMetric = normalizeComparableText(metricName);
+  if (config.key === "singleQubitGateSpeed" || config.key === "twoQubitGateSpeed") {
+    if (normalizedMetric.includes("clops")) {
+      return value <= 0 ? null : 1 / value;
+    }
+  }
+  if (config.key === "logicalErrorRate" || config.key === "faultTolerantQecLogicalErrorRate") {
+    if (normalizedMetric.includes("fidelity")) {
+      return value <= 0 ? null : 1 / value;
+    }
+  }
+  return value;
+}
+
+function matchesRelaxedTaskMetric(taskKey: MetriqTaskKey, metricName: string, benchmarkName: string): boolean {
+  const metric = normalizeComparableText(metricName);
+  const benchmark = normalizeComparableText(benchmarkName);
+  switch (taskKey) {
+  case "singleQubitGateSpeed":
+  case "twoQubitGateSpeed":
+    return metric.includes("clops") || benchmark.includes("clops");
+  case "twoQubitFidelity":
+    return metric.includes("fidelity") || metric.includes("success") || metric.includes("polarization");
+  case "logicalErrorRate":
+  case "faultTolerantQecLogicalErrorRate":
+    return metric.includes("error") || metric.includes("fidelity") || benchmark.includes("eplg");
+  case "quantumVolume":
+    return metric.includes("volume") || metric.includes("score");
+  case "coherenceT2":
+    return metric.includes("t2") || metric.includes("coherence");
+  case "readoutFidelity":
+    return metric.includes("readout") || metric.includes("measurement") || metric.includes("success");
+  case "aq":
+    return metric.includes("score") || metric.includes("accuracy") || metric.includes("fidelity");
+  default:
+    return false;
+  }
 }
 
 function looksTheoreticalRecord(value: string): boolean {
@@ -2868,38 +3106,6 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-function buildMetriqSourceLabel(result: Record<string, unknown>): string | null {
-  const platform = firstString(result, ["platformName", "providerName"]);
-  const submission = firstString(result, ["submissionName", "name", "title"]);
-  if (platform && submission && platform !== submission) {
-    return `${platform}: ${submission}`;
-  }
-  return platform ?? submission ?? firstString(result, ["methodName"]);
-}
-
-function extractPlatformAttribution(result: Record<string, unknown>) {
-  const platformName = firstString(result, ["platformName"]);
-  const providerName = firstString(result, ["providerName"]);
-  const submissionPlatformRefId = stringifyNullable(result.submissionPlatformRefId);
-  const submissionName = firstString(result, ["submissionName", "name", "title"]);
-  const platformLabel = platformName ?? providerName ?? (submissionPlatformRefId ? `platform#${submissionPlatformRefId}` : null);
-  const displayLabel = platformLabel && submissionName && platformLabel !== submissionName ?
-    `${platformLabel}: ${submissionName}` :
-    platformLabel ?? submissionName ?? null;
-
-  const status: FrontierAttributionStatus =
-    platformName ? "direct" :
-      providerName ? "provider-only" :
-        submissionPlatformRefId ? "platform-ref-only" :
-          "unattributed";
-
-  return {
-    isAttributed: Boolean(platformName || providerName || submissionPlatformRefId),
-    displayLabel,
-    status,
-  };
-}
-
 function parseDateMs(value: unknown): number | null {
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
@@ -2954,7 +3160,12 @@ async function fetchJson<T>(url: string, retries: number, init?: RequestInit): P
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const response = await fetch(url, init);
+      const timeoutSignal = AbortSignal.timeout(25000);
+      const combinedSignal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+      const response = await fetch(url, {
+        ...init,
+        signal: combinedSignal,
+      });
       if (!response.ok) {
         throw new HttpStatusError(response.status, `Request failed with status ${response.status}`);
       }
@@ -2962,7 +3173,8 @@ async function fetchJson<T>(url: string, retries: number, init?: RequestInit): P
     } catch (error) {
       lastError = error;
       if (attempt < retries) {
-        await sleep((attempt + 1) * 2000);
+        const jitterMs = Math.floor(Math.random() * 400);
+        await sleep(((attempt + 1) * 2000) + jitterMs);
       }
     }
   }
