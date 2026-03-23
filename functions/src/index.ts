@@ -2303,8 +2303,7 @@ function selectBestBenchmarkResult(
       if (metricValue === null) {
         continue;
       }
-      if (!metricMatchesTask(metricName, benchmarkName, config) &&
-        !matchesRelaxedTaskMetric(config.key, metricName, benchmarkName)) {
+      if (!metricMatchesTask(metricName, benchmarkName, config)) {
         continue;
       }
       const evaluatedAtMs = parseDateMs(row.timestamp);
@@ -2463,7 +2462,7 @@ function synthesizeAqSignalFromCoverage(
     frontierSignals.readoutFidelity?.normalizedScore,
     frontierSignals.logicalErrorRate?.normalizedScore,
   ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  if (usable.length < 1) {
+  if (usable.length < 3) {
     return null;
   }
   const normalizedProxy = clampPercent(usable.reduce((sum, value) => sum + value, 0) / usable.length);
@@ -2988,31 +2987,6 @@ function adjustMetricValueForTask(config: MetriqTaskConfig, metricName: string, 
     }
   }
   return value;
-}
-
-function matchesRelaxedTaskMetric(taskKey: MetriqTaskKey, metricName: string, benchmarkName: string): boolean {
-  const metric = normalizeComparableText(metricName);
-  const benchmark = normalizeComparableText(benchmarkName);
-  switch (taskKey) {
-  case "singleQubitGateSpeed":
-  case "twoQubitGateSpeed":
-    return metric.includes("clops") || benchmark.includes("clops");
-  case "twoQubitFidelity":
-    return metric.includes("fidelity") || metric.includes("success") || metric.includes("polarization");
-  case "logicalErrorRate":
-  case "faultTolerantQecLogicalErrorRate":
-    return metric.includes("error") || metric.includes("fidelity") || benchmark.includes("eplg");
-  case "quantumVolume":
-    return metric.includes("volume") || metric.includes("score");
-  case "coherenceT2":
-    return metric.includes("t2") || metric.includes("coherence");
-  case "readoutFidelity":
-    return metric.includes("readout") || metric.includes("measurement") || metric.includes("success");
-  case "aq":
-    return metric.includes("score") || metric.includes("accuracy") || metric.includes("fidelity");
-  default:
-    return false;
-  }
 }
 
 function looksTheoreticalRecord(value: string): boolean {
