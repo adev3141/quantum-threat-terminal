@@ -2500,7 +2500,7 @@ function buildGlobalMetricsDoc(
   methodology: GlobalMetricsMethodologyDoc,
   now: Timestamp,
 ): GlobalMetricsDoc {
-  const aqSignal = frontierSignals.aq;
+  const aqSignal = frontierSignals.aq ?? deriveAqSignalForMetrics(frontierSignals, now);
   if (!aqSignal) {
     throw new HttpStatusError(502, "AQ frontier signal is required to build global metrics");
   }
@@ -2580,6 +2580,45 @@ function buildGlobalMetricsDoc(
     },
     last_successful_sync: now,
     last_attempted_sync: now,
+  };
+}
+
+function deriveAqSignalForMetrics(
+  frontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>>,
+  now: Timestamp,
+): FrontierSignal | null {
+  const normalizedSignals = Object.values(frontierSignals)
+    .filter((entry): entry is FrontierSignal => Boolean(entry))
+    .filter((entry) => typeof entry.normalizedScore === "number" && Number.isFinite(entry.normalizedScore));
+  if (normalizedSignals.length === 0) {
+    return null;
+  }
+  const avg = clampPercent(
+    normalizedSignals.reduce((sum, entry) => sum + (entry.normalizedScore ?? 0), 0) / normalizedSignals.length,
+  );
+  const aqProxy = Math.max(1, Math.round((avg / 100) * 256));
+  return {
+    taskId: 128,
+    taskName: "Algorithmic Qubits (global fallback proxy)",
+    acceptedMetricName: "aq_proxy_fallback",
+    metricValue: aqProxy,
+    selectionRule: "max",
+    normalizationStrategy: "log-upper",
+    normalizationParams: {
+      referenceValue: 256,
+    },
+    normalizedScore: logNormalizedPercent(aqProxy, 256),
+    sourceLabel: "Synthesized from available normalized benchmark frontier signals",
+    submissionId: "aq-proxy-fallback",
+    platformId: "benchmark-family",
+    evaluatedAt: now,
+    attributionStatus: "provider-only",
+    status: "selected",
+    exclusionReason: null,
+    rawSnapshot: {
+      derivedFromSignals: normalizedSignals.map((entry) => entry.taskName),
+      normalizedAverage: avg,
+    },
   };
 }
 
