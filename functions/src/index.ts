@@ -2505,10 +2505,15 @@ function buildGlobalMetricsDoc(
     throw new HttpStatusError(502, "AQ frontier signal is required to build global metrics");
   }
 
+  const effectiveFrontierSignals: Partial<Record<MetriqTaskKey, FrontierSignal>> = {
+    ...frontierSignals,
+    aq: aqSignal,
+  };
+
   const utilityFrontierPercent = clampPercent(
     weightedAverage([
-      frontierSignals.aq ? {score: frontierSignals.aq.normalizedScore ?? 0, weight: 0.7} : null,
-      frontierSignals.quantumVolume ? {score: frontierSignals.quantumVolume.normalizedScore ?? 0, weight: 0.3} : null,
+      effectiveFrontierSignals.aq ? {score: effectiveFrontierSignals.aq.normalizedScore ?? 0, weight: 0.7} : null,
+      effectiveFrontierSignals.quantumVolume ? {score: effectiveFrontierSignals.quantumVolume.normalizedScore ?? 0, weight: 0.3} : null,
     ]),
   );
 
@@ -2566,7 +2571,7 @@ function buildGlobalMetricsDoc(
     utility_frontier_percent: utilityFrontierPercent,
     fault_tolerance_bridge_percent: faultToleranceBridgePercent,
     frontier_dependency_version: methodology.methodology_version,
-    frontier_signals: frontierSignals,
+    frontier_signals: effectiveFrontierSignals,
     is_stale: false,
     stale_after_hours: METRICS_STALE_AFTER_HOURS,
     selected_record: {
