@@ -37,7 +37,7 @@ const tableOfContents = [
   { id: 'abstract', label: 'Abstract' },
   { id: 'architecture', label: 'System Architecture' },
   { id: 'cadence', label: 'Ingestion Cadence' },
-  { id: 'curation', label: 'Metriq Curation Policy' },
+  { id: 'curation', label: 'Benchmark Curation Policy' },
   { id: 'normalization', label: 'Normalization Framework' },
   { id: 'qday', label: 'Q-Day Readiness Model' },
   { id: 'hndl', label: 'HNDL Pressure Model' },
@@ -49,9 +49,9 @@ const tableOfContents = [
 const syncCadence = [
   {
     job: 'syncMetriqMetrics',
-    cadence: 'Every 24 hours',
-    purpose: 'Fetch curated Metriq task results, build the frontier document, and publish global metrics and global risk signals.',
-    writes: '`global/metriq_frontier`, `global/metrics`, `global/risk_signals`, and matching history collections',
+    cadence: 'Every 6 hours',
+    purpose: 'Fetch benchmark.latest.json and platforms index, build the benchmark frontier, and publish readiness/risk outputs.',
+    writes: '`global/benchmark_frontier`, `global/readiness_projection`, `global/threat_signals` (+ legacy compatibility docs and history collections)',
   },
   {
     job: 'syncFinnhubQuotes',
@@ -81,27 +81,22 @@ const syncCadence = [
 
 const publicDataContracts = [
   {
-    collection: '`global/metrics`',
+    collection: '`global/readiness_projection`',
     access: 'Public read-only',
     role: 'Published Q-Day readiness output, frontier-derived readiness percentages, and selected AQ provenance.',
   },
   {
-    collection: '`global/metrics_methodology`',
+    collection: '`global/benchmark_methodology`',
     access: 'Public read-only',
-    role: 'Current Q-Day methodology assumptions and curation rules.',
+    role: 'Current benchmark curation, readiness, and threat methodology assumptions.',
   },
   {
-    collection: '`global/metriq_frontier`',
+    collection: '`global/benchmark_frontier`',
     access: 'Public read-only',
-    role: 'Selected production signals, diagnostic signals, exclusions, sync status, and Metriq provenance.',
+    role: 'Selected production signals, diagnostic signals, exclusions, sync status, and benchmark provenance.',
   },
   {
-    collection: '`global/risk_methodology`',
-    access: 'Public read-only',
-    role: 'Current HNDL model weights and exposure assumptions.',
-  },
-  {
-    collection: '`global/risk_signals`',
+    collection: '`global/threat_signals`',
     access: 'Public read-only',
     role: 'Published threat-matrix axes, HNDL pressure, and HNDL status.',
   },
@@ -112,9 +107,9 @@ const publicDataContracts = [
   },
   {
     collection:
-      '`global_metrics_history`, `global_metrics_methodology_history`, `global_metriq_frontier_history`, `global_risk_methodology_history`, `global_risk_signals_history`',
+      '`benchmark_frontier_history`, `readiness_projection_history`, `threat_signals_history`, `benchmark_methodology_history`',
     access: 'Public read-only',
-    role: 'Historical snapshots for published data and methodology changes.',
+    role: 'Historical snapshots for published benchmark-native data and methodology changes.',
   },
   {
     collection: '`risk_reference`, `crypto_reference`, `crypto_reference_history`, `ingestion_runs`',
@@ -124,7 +119,7 @@ const publicDataContracts = [
 ]
 
 const productionSignals = [
-  ['`aq`', '128', 'Algorithmic Qubits', '`max`', '`log-upper`', 'Reference 256', 'Required anchor for `global/metrics`; also feeds utility frontier in `global/risk_signals`.'],
+  ['`aq`', '128', 'Algorithmic Qubits', '`max`', '`log-upper`', 'Reference 256', 'Required anchor for `global/readiness_projection`; also feeds utility frontier in `global/threat_signals`.'],
   ['`physicalQubits`', '159', 'Number of physical qubits', '`max`', '`log-upper`', 'Reference 100000', 'Feeds hardware-scale axis.'],
   ['`twoQubitFidelity`', '53', '2-qubit Clifford gate fidelity', '`max`', '`linear`', 'Lower 98, upper 99.99', 'Feeds gate-quality axis.'],
   ['`logicalErrorRate`', '60', 'Error correction and mitigation', '`min`', '`inverse-log`', 'Worst 1e-1, best 1e-6', 'Feeds the fault-tolerance bridge and fault-tolerance axis.'],
@@ -339,15 +334,15 @@ export default function WhitepaperPage() {
                     <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
                       <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">CORE SOURCES</p>
                       <p className="mt-3 text-sm leading-6 text-gray-300">
-                        Metriq for frontier benchmark data, Finnhub for market snapshots and profiles, and
+                        Metriq benchmark feeds for frontier data, Finnhub for market snapshots and profiles, and
                         GNews for the watchlist feed.
                       </p>
                     </div>
                     <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
                       <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">CORE PUBLIC OUTPUTS</p>
                       <p className="mt-3 text-sm leading-6 text-gray-300">
-                        <InlineCode>global/metriq_frontier</InlineCode>, <InlineCode>global/metrics</InlineCode>,
-                        and <InlineCode>global/risk_signals</InlineCode>.
+                        <InlineCode>global/benchmark_frontier</InlineCode>, <InlineCode>global/readiness_projection</InlineCode>,
+                        and <InlineCode>global/threat_signals</InlineCode>.
                       </p>
                     </div>
                     <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
@@ -369,8 +364,8 @@ export default function WhitepaperPage() {
             >
               <p className="text-base leading-8 text-gray-300">
                 XQBTS Terminal is implemented as a Next.js application backed by Firebase Firestore and
-                Cloud Functions. Its core model ingests a configured set of Metriq tasks, filters those
-                results through an explicit curation policy, normalizes admitted production signals onto a
+                Cloud Functions. Its core model ingests benchmark-family feeds and a platform index, filters
+                those results through an explicit curation policy, normalizes admitted production signals onto a
                 0-100 scale, and publishes two derived global outputs: a Q-Day readiness document and a
                 global HNDL pressure document.
               </p>
@@ -416,8 +411,8 @@ export default function WhitepaperPage() {
                     <p className="font-mono text-sm tracking-[0.18em] text-cyan-300">REGISTRY AND SOURCE PLANE</p>
                   </div>
                   <p className="mt-4 text-sm leading-7 text-gray-300">
-                    The company registry is seeded from an XML file. Source integrations use Metriq for
-                    benchmark tasks, Finnhub for market quotes and company profiles, and GNews for batched
+                    The company registry is seeded from an XML file. Source integrations use Metriq benchmark
+                    feeds and platform index data, Finnhub for market quotes and company profiles, and GNews for batched
                     article search. Source access is controlled by Firebase secrets.
                   </p>
                 </div>
@@ -427,9 +422,8 @@ export default function WhitepaperPage() {
                     <p className="font-mono text-sm tracking-[0.18em] text-cyan-300">METHODOLOGY PLANE</p>
                   </div>
                   <p className="mt-4 text-sm leading-7 text-gray-300">
-                    Two public read-only methodology documents define the model behavior:
-                    <InlineCode>global/metrics_methodology</InlineCode> and{' '}
-                    <InlineCode>global/risk_methodology</InlineCode>. Admin update endpoints validate input,
+                    The benchmark-native methodology is published to{' '}
+                    <InlineCode>global/benchmark_methodology</InlineCode>. Admin update endpoints validate input,
                     persist the next methodology, and append methodology history records with{' '}
                     <InlineCode>changedBy</InlineCode> and <InlineCode>reason</InlineCode>.
                   </p>
@@ -440,7 +434,7 @@ export default function WhitepaperPage() {
                     <p className="font-mono text-sm tracking-[0.18em] text-cyan-300">PUBLICATION PLANE</p>
                   </div>
                   <p className="mt-4 text-sm leading-7 text-gray-300">
-                    After each Metriq sync, the platform publishes the current frontier document and, if
+                    After each benchmark sync, the platform publishes the current frontier document and, if
                     derivation succeeds, publishes the current Q-Day and HNDL documents. Each publication
                     also writes a history document containing previous and next values.
                   </p>
@@ -458,7 +452,7 @@ export default function WhitepaperPage() {
                 </div>
               </div>
               <FormulaBlock>
-                {'1. ingest source data\n2. filter source records through methodology rules\n3. select one best result per configured task\n4. normalize admitted production signals\n5. derive global metrics and global risk signals\n6. publish current docs and append history\n7. render public documents in the terminal'}
+                {'1. ingest benchmark.latest.json + platforms index\n2. filter source records through methodology rules\n3. select one best candidate per required production signal\n4. normalize admitted production signals\n5. derive readiness and threat outputs\n6. publish current docs and append history\n7. render public documents in the terminal'}
               </FormulaBlock>
             </PaperSection>
 
@@ -503,9 +497,9 @@ export default function WhitepaperPage() {
 
             <PaperSection
               id="curation"
-              eyebrow="04 / METRIQ CURATION"
-              title="Metriq Frontier Curation Policy"
-              description="The core frontier is not a raw benchmark dump. It is a filtered, one-result-per-task selection layer governed by explicit methodology defaults."
+              eyebrow="04 / BENCHMARK CURATION"
+              title="Benchmark Frontier Curation Policy"
+              description="The core frontier is not a raw benchmark dump. It is a filtered, benchmark-family selection layer governed by explicit methodology defaults."
             >
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-cyan-950 bg-black/50 p-5">
@@ -544,8 +538,8 @@ export default function WhitepaperPage() {
                     <InlineCode>dwave</InlineCode>.
                   </p>
                   <p className="mt-4 text-sm leading-7 text-gray-300">
-                    Allowed task names default to the configured Metriq task labels. If a task is not in
-                    the allowlist, the selection function returns no candidate for that task.
+                    Allowed benchmark families default to configured family gates per production signal. If a
+                    family is not allowed for a signal, the selection function returns no candidate.
                   </p>
                 </div>
               </div>
@@ -554,9 +548,9 @@ export default function WhitepaperPage() {
                 <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">SELECTION RULES</p>
                 <ul className="mt-4 space-y-2 text-sm leading-7 text-gray-300">
                   <li>Metric values must parse as finite numbers.</li>
-                  <li>Metric names must match the accepted metric names or configured aliases for the task.</li>
+                  <li>Metric names must match accepted signal mappings or relaxed benchmark metric aliases.</li>
                   <li>Results must resolve to a source label.</li>
-                  <li>Tasks that require platform attribution reject unattributed records.</li>
+                  <li>Signals that require platform attribution reject unattributed records.</li>
                   <li>Curated mode enforces the platform allowlist against extracted platform metadata.</li>
                   <li>
                     Theoretical markers are rejected when the methodology enables theoretical rejection:{' '}
@@ -568,8 +562,8 @@ export default function WhitepaperPage() {
                     ))}
                     .
                   </li>
-                  <li>For `max` tasks the highest metric wins, with recency as a tie-breaker.</li>
-                  <li>For `min` tasks the lowest metric wins, with recency as a tie-breaker.</li>
+                  <li>For `max` signals the highest metric wins, with recency as a tie-breaker.</li>
+                  <li>For `min` signals the lowest metric wins, with recency as a tie-breaker.</li>
                 </ul>
               </div>
 
@@ -583,7 +577,7 @@ export default function WhitepaperPage() {
                   </p>
                 </div>
                 <DataTable
-                  columns={['Key', 'Task', 'Label', 'Select', 'Normalize', 'Parameters', 'Role']}
+                  columns={['Key', 'Signal ID', 'Label', 'Select', 'Normalize', 'Parameters', 'Role']}
                   rows={productionSignals.map((row) => row.map((cell) => <span key={`${row[0]}-${String(cell)}`}>{cell}</span>))}
                 />
               </div>
@@ -597,7 +591,7 @@ export default function WhitepaperPage() {
                   </p>
                 </div>
                 <DataTable
-                  columns={['Key', 'Task', 'Label', 'Select', 'Normalize', 'Accepted metrics']}
+                  columns={['Key', 'Signal ID', 'Label', 'Select', 'Normalize', 'Accepted metrics']}
                   rows={diagnosticSignals.map((row) => row.map((cell) => <span key={`${row[0]}-${String(cell)}`}>{cell}</span>))}
                 />
               </div>
@@ -652,12 +646,13 @@ export default function WhitepaperPage() {
               id="qday"
               eyebrow="06 / Q-DAY MODEL"
               title="Q-Day Readiness Model"
-              description="The Q-Day document is derived from AQ, utility normalization, and a curated fault-tolerance bridge. It is published to `global/metrics`."
+              description="The Q-Day document is derived from AQ, utility normalization, and a curated fault-tolerance bridge. It is published to `global/readiness_projection`."
             >
               <p className="text-base leading-8 text-gray-300">
-                The Q-Day model requires the frontier AQ signal. If AQ is missing, the global metrics build
-                fails. Utility frontier and fault-tolerance bridge are each computed from normalized scores,
-                then combined with the raw AQ metric value to produce <InlineCode>current_sota_lq</InlineCode>.
+                The Q-Day model requires an AQ signal; when direct AQ is missing, the ingestion layer may
+                synthesize an AQ proxy from benchmark coverage before publishing. Utility frontier and
+                fault-tolerance bridge are each computed from normalized scores, then combined with the raw
+                AQ metric value to produce <InlineCode>current_sota_lq</InlineCode>.
                 The code describes that field as an effective logical-qubit proxy derived from AQ frontier
                 and curated fault-tolerance bridge metrics.
               </p>
@@ -792,8 +787,8 @@ export default function WhitepaperPage() {
               <div className="rounded-xl border border-amber-950 bg-amber-950/10 p-5">
                 <p className="font-mono text-[11px] tracking-[0.18em] text-amber-300">SEPARATION FROM THE CORE MODEL</p>
                 <p className="mt-4 text-sm leading-7 text-gray-300">
-                  The functions that build <InlineCode>global/metrics</InlineCode> and{' '}
-                  <InlineCode>global/risk_signals</InlineCode> consume curated frontier production signals
+                  The functions that build <InlineCode>global/readiness_projection</InlineCode> and{' '}
+                  <InlineCode>global/threat_signals</InlineCode> consume curated frontier production signals
                   and methodology documents only. Finnhub and GNews are therefore watchlist inputs, not
                   scientific inputs to the core frontier, Q-Day, or HNDL calculations.
                 </p>
@@ -942,7 +937,7 @@ export default function WhitepaperPage() {
                 description="Current public publication targets."
               >
                 <div className="space-y-2">
-                  {['global/metriq_frontier', 'global/metrics', 'global/risk_signals'].map((path) => (
+                  {['global/benchmark_frontier', 'global/readiness_projection', 'global/threat_signals'].map((path) => (
                     <div
                       key={path}
                       className="rounded-lg border border-cyan-950 bg-cyan-950/10 px-3 py-2 font-mono text-xs text-cyan-200"
