@@ -21,6 +21,16 @@ export const metadata: Metadata = {
   title: 'Whitepaper | XQBTS Terminal',
   description:
     'Implementation-grounded whitepaper for the XQBTS operational quantum-threat intelligence platform.',
+  keywords: [
+    'quantum threat whitepaper',
+    'q-day model methodology',
+    'hndl model',
+    'quantum benchmark curation',
+    'pqc risk modeling',
+  ],
+  alternates: {
+    canonical: '/whitepaper',
+  },
 }
 
 const tableOfContents = [

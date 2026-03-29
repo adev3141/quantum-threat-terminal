@@ -17,6 +17,15 @@ export const metadata: Metadata = {
   title: 'Contact | XQBTS Terminal',
   description:
     'Contact 3DDev SMC PVT about XQBTS Terminal access, partnerships, and funding conversations.',
+  keywords: [
+    'contact xqbts',
+    'quantum threat intelligence partnership',
+    'quantum security startup funding',
+    'xqbts funding inquiry',
+  ],
+  alternates: {
+    canonical: '/contact',
+  },
 }
 
 const contactChannels = [

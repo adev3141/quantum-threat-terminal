@@ -75,6 +75,44 @@ type TechnicalLeaderboardRow = LeaderboardRow & {
   };
 };
 
+const SEO_KEYWORD_CLUSTERS = [
+  {
+    heading: 'Quantum Threat Intelligence',
+    keywords: ['quantum threat', 'quantum threat intelligence', 'quantum computing security', 'quantum risk monitoring'],
+  },
+  {
+    heading: 'Q-Day and PQC Migration',
+    keywords: ['q-day countdown', 'q-day readiness projection', 'post-quantum cryptography', 'pqc migration strategy'],
+  },
+  {
+    heading: 'Benchmark and Research Operations',
+    keywords: ['quantum benchmark tracking', 'benchmark evidence', 'quantum compilation website', 'quantum readiness model'],
+  },
+];
+
+const SEO_FAQ_ITEMS = [
+  {
+    question: 'What is Quantum Threat Terminal by XQBTS?',
+    answer:
+      'Quantum Threat Terminal is a benchmark-native intelligence dashboard that tracks quantum readiness signals, models Q-Day timelines, and publishes cryptographic risk indicators.',
+  },
+  {
+    question: 'How does XQBTS estimate Q-Day readiness?',
+    answer:
+      'XQBTS uses curated benchmark-family signals and normalized model inputs to estimate readiness trajectories. The output is modeled guidance and not a direct measured breach-date.',
+  },
+  {
+    question: 'Does XQBTS support post-quantum cryptography planning?',
+    answer:
+      'Yes. XQBTS provides cryptographic risk context and HNDL pressure modeling to help teams prioritize PQC migration and long-lived data protection decisions.',
+  },
+  {
+    question: 'What makes XQBTS different from generic quantum news sites?',
+    answer:
+      'XQBTS emphasizes structured benchmark evidence, explicit methodology notes, admitted versus rejected signal transparency, and production-oriented risk surfaces rather than headline aggregation alone.',
+  },
+];
+
 const COMMON_COMPANY_TERMS = new Set([
   'inc',
   'corp',
@@ -1711,6 +1749,21 @@ export default function QuantumThreatTerminal() {
   const showFrontierSkeleton = globalMetriqFrontierLoading && !globalMetriqFrontier && !globalMetriqFrontierError;
   const showHardwareSkeleton = companyLoading && !companyError && hardwareRows.length === 0;
   const showNewsSkeleton = newsLoading && !newsError && newsFeed.length === 0;
+  const faqStructuredData = useMemo(
+    () => ({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: SEO_FAQ_ITEMS.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    }),
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(17,94,89,0.28),_transparent_45%),linear-gradient(180deg,_#020617,_#000000_38%,_#020617)] text-white">
@@ -2322,9 +2375,50 @@ export default function QuantumThreatTerminal() {
                 </form>
               </CardContent>
             </Card>
+
+            <Card className="border-cyan-900 bg-black/40">
+              <CardHeader>
+                <CardTitle className="text-cyan-300">Quantum Threat Intelligence Guide (SEO / GEO / AEO)</CardTitle>
+                <CardDescription className="text-gray-500">
+                  Keyword-targeted primer for search engines, answer engines, and AI retrieval systems.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <p className="text-sm leading-7 text-gray-300">
+                  XQBTS is a quantum threat intelligence platform focused on benchmark evidence, Q-Day readiness projection, post-quantum cryptography migration context, and modeled HNDL risk pressure. Teams evaluating quantum risk and quantum-safe transition planning can use the terminal as a live reference surface.
+                </p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {SEO_KEYWORD_CLUSTERS.map((cluster) => (
+                    <div key={cluster.heading} className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
+                      <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">{cluster.heading}</p>
+                      <ul className="mt-3 space-y-2 text-sm text-gray-300">
+                        {cluster.keywords.map((keyword) => (
+                          <li key={keyword}>• {keyword}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-5">
+                  <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">AEO FAQ</p>
+                  <div className="mt-4 space-y-3">
+                    {SEO_FAQ_ITEMS.map((item) => (
+                      <details key={item.question} className="rounded-lg border border-cyan-950/80 bg-black/35 p-3">
+                        <summary className="cursor-pointer font-mono text-xs tracking-[0.08em] text-cyan-200">{item.question}</summary>
+                        <p className="mt-2 text-sm leading-7 text-gray-300">{item.answer}</p>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
       </div>
 
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData) }}
+      />
       <AuditModal row={selectedAuditRow} onClose={() => setSelectedAuditRow(null)} />
     </div>
   );
