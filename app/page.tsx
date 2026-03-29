@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, Building2, Database, Gauge, HandCoins, Info, Mail, TrendingUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -710,6 +710,29 @@ function TerminalWarning({ title, message }: { title: string; message: string })
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-300">{title}</p>
       <p className="mt-2 text-sm text-amber-100">{message}</p>
     </div>
+  );
+}
+
+function CollapsibleTechnicalDetails({
+  title,
+  className = '',
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className={`group rounded-xl border border-cyan-950/80 bg-black/30 p-4 ${className}`}>
+      <summary className="cursor-pointer list-none font-mono text-xs tracking-[0.16em] text-cyan-300">
+        <span className="inline-flex items-center gap-2">
+          <span>{title}</span>
+          <span className="text-[10px] text-gray-500 group-open:hidden">[expand]</span>
+          <span className="hidden text-[10px] text-gray-500 group-open:inline">[collapse]</span>
+        </span>
+      </summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
   );
 }
 
@@ -1831,15 +1854,17 @@ export default function QuantumThreatTerminal() {
                           <p className="mt-8 font-mono text-sm text-gray-400">
                             Last successful sync: {qDay.lastSuccessfulSyncLabel} | Methodology: {qDay.methodologyVersion}
                           </p>
-                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                            Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
-                          </p>
-                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                            Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
-                          </p>
-                          <p className="mt-3 max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
-                            {qDay.methodologyNote}
-                          </p>
+                          <CollapsibleTechnicalDetails title="READINESS METHODOLOGY NOTES" className="mt-3">
+                            <p className="font-mono text-xs leading-relaxed text-gray-500">
+                              Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
+                            </p>
+                            <p className="font-mono text-xs leading-relaxed text-gray-500">
+                              Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
+                            </p>
+                            <p className="max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
+                              {qDay.methodologyNote}
+                            </p>
+                          </CollapsibleTechnicalDetails>
                           {globalMetricsError ? (
                             <p className="mt-3 text-sm text-red-300">Top metrics unavailable: {globalMetricsError}</p>
                           ) : null}
@@ -1957,12 +1982,14 @@ export default function QuantumThreatTerminal() {
                         </div>
                       ))}
                     </div>
-                    <p className="mt-5 font-mono text-xs leading-relaxed text-gray-500">
-                      Methodology: {riskAssessment.methodologyVersion}. {riskAssessment.methodologyNote}
-                    </p>
-                    <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                      Axis values are normalized frontier scores, not raw lab units. Status badges indicate whether each axis is based on direct benchmark coverage, partially modelled coverage, or unavailable evidence.
-                    </p>
+                    <CollapsibleTechnicalDetails title="THREAT MATRIX METHODOLOGY" className="mt-5">
+                      <p className="font-mono text-xs leading-relaxed text-gray-500">
+                        Methodology: {riskAssessment.methodologyVersion}. {riskAssessment.methodologyNote}
+                      </p>
+                      <p className="font-mono text-xs leading-relaxed text-gray-500">
+                        Axis values are normalized frontier scores, not raw lab units. Status badges indicate whether each axis is based on direct benchmark coverage, partially modelled coverage, or unavailable evidence.
+                      </p>
+                    </CollapsibleTechnicalDetails>
                   </>
                 ) : (
                   <TerminalWarning
@@ -2030,12 +2057,19 @@ export default function QuantumThreatTerminal() {
                           style={{ width: `${riskAssessment.hndlPressure}%` }}
                         />
                       </div>
-                      <p className="mt-3 text-sm leading-relaxed text-amber-100/80">
-                        HNDL is a modelled exposure-pressure index: vulnerable encrypted share x quantum cryptanalytic readiness. It is not direct byte-volume telemetry.
-                      </p>
-                      <p className="mt-2 font-mono text-xs leading-relaxed text-amber-100/70">
-                        Harvestable share is a methodology input. Cryptanalytic readiness is derived from normalized benchmark axes published by the backend.
-                      </p>
+                      <details className="mt-3 rounded-xl border border-amber-900 bg-black/35 p-4">
+                        <summary className="cursor-pointer list-none font-mono text-xs tracking-[0.16em] text-amber-300">
+                          HNDL FORMULA & INTERPRETATION
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm leading-relaxed text-amber-100/80">
+                            HNDL is a modelled exposure-pressure index: vulnerable encrypted share x quantum cryptanalytic readiness. It is not direct byte-volume telemetry.
+                          </p>
+                          <p className="font-mono text-xs leading-relaxed text-amber-100/70">
+                            Harvestable share is a methodology input. Cryptanalytic readiness is derived from normalized benchmark axes published by the backend.
+                          </p>
+                        </div>
+                      </details>
                     </div>
 
                     <div>
@@ -2073,14 +2107,19 @@ export default function QuantumThreatTerminal() {
                       })}
                     </div>
 
-                    <div className="rounded-xl border border-amber-800 bg-black/55 p-5">
-                      <p className="font-mono text-lg leading-relaxed text-amber-200">
-                        Last successful sync: {riskAssessment.lastSuccessfulSyncLabel}. Methodology: {riskAssessment.methodologyVersion}.
-                      </p>
-                      <p className="mt-3 text-sm leading-relaxed text-amber-100/80">
-                        {riskAssessment.methodologyNote}
-                      </p>
-                    </div>
+                    <details className="rounded-xl border border-amber-800 bg-black/55 p-5">
+                      <summary className="cursor-pointer list-none font-mono text-sm tracking-[0.16em] text-amber-200">
+                        HNDL METHOD DETAILS
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <p className="font-mono text-lg leading-relaxed text-amber-200">
+                          Last successful sync: {riskAssessment.lastSuccessfulSyncLabel}. Methodology: {riskAssessment.methodologyVersion}.
+                        </p>
+                        <p className="text-sm leading-relaxed text-amber-100/80">
+                          {riskAssessment.methodologyNote}
+                        </p>
+                      </div>
+                    </details>
                   </>
                 ) : (
                   <TerminalWarning
