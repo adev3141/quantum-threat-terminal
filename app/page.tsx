@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, Building2, Database, Gauge, HandCoins, Info, Mail, TrendingUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -74,6 +74,44 @@ type TechnicalLeaderboardRow = LeaderboardRow & {
     sourceLinks: SourceLink[];
   };
 };
+
+const SEO_KEYWORD_CLUSTERS = [
+  {
+    heading: 'Quantum Threat Intelligence',
+    keywords: ['quantum threat', 'quantum threat intelligence', 'quantum computing security', 'quantum risk monitoring'],
+  },
+  {
+    heading: 'Q-Day and PQC Migration',
+    keywords: ['q-day countdown', 'q-day readiness projection', 'post-quantum cryptography', 'pqc migration strategy'],
+  },
+  {
+    heading: 'Benchmark and Research Operations',
+    keywords: ['quantum benchmark tracking', 'benchmark evidence', 'quantum compilation website', 'quantum readiness model'],
+  },
+];
+
+const SEO_FAQ_ITEMS = [
+  {
+    question: 'What is Quantum Threat Terminal by XQBTS?',
+    answer:
+      'Quantum Threat Terminal is a benchmark-native intelligence dashboard that tracks quantum readiness signals, models Q-Day timelines, and publishes cryptographic risk indicators.',
+  },
+  {
+    question: 'How does XQBTS estimate Q-Day readiness?',
+    answer:
+      'XQBTS uses curated benchmark-family signals and normalized model inputs to estimate readiness trajectories. The output is modeled guidance and not a direct measured breach-date.',
+  },
+  {
+    question: 'Does XQBTS support post-quantum cryptography planning?',
+    answer:
+      'Yes. XQBTS provides cryptographic risk context and HNDL pressure modeling to help teams prioritize PQC migration and long-lived data protection decisions.',
+  },
+  {
+    question: 'What makes XQBTS different from generic quantum news sites?',
+    answer:
+      'XQBTS emphasizes structured benchmark evidence, explicit methodology notes, admitted versus rejected signal transparency, and production-oriented risk surfaces rather than headline aggregation alone.',
+  },
+];
 
 const COMMON_COMPANY_TERMS = new Set([
   'inc',
@@ -710,6 +748,29 @@ function TerminalWarning({ title, message }: { title: string; message: string })
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-300">{title}</p>
       <p className="mt-2 text-sm text-amber-100">{message}</p>
     </div>
+  );
+}
+
+function CollapsibleTechnicalDetails({
+  title,
+  className = '',
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className={`group rounded-xl border border-cyan-950/80 bg-black/30 p-4 ${className}`}>
+      <summary className="cursor-pointer list-none font-mono text-xs tracking-[0.16em] text-cyan-300">
+        <span className="inline-flex items-center gap-2">
+          <span>{title}</span>
+          <span className="text-[10px] text-gray-500 group-open:hidden">[expand]</span>
+          <span className="hidden text-[10px] text-gray-500 group-open:inline">[collapse]</span>
+        </span>
+      </summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
   );
 }
 
@@ -1688,6 +1749,21 @@ export default function QuantumThreatTerminal() {
   const showFrontierSkeleton = globalMetriqFrontierLoading && !globalMetriqFrontier && !globalMetriqFrontierError;
   const showHardwareSkeleton = companyLoading && !companyError && hardwareRows.length === 0;
   const showNewsSkeleton = newsLoading && !newsError && newsFeed.length === 0;
+  const faqStructuredData = useMemo(
+    () => ({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: SEO_FAQ_ITEMS.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    }),
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(17,94,89,0.28),_transparent_45%),linear-gradient(180deg,_#020617,_#000000_38%,_#020617)] text-white">
@@ -1774,7 +1850,7 @@ export default function QuantumThreatTerminal() {
                   <QDayCountdownSkeleton />
                 ) : (
                   <>
-                    <p className="font-mono text-xs tracking-[0.24em] text-gray-500">ESTIMATED Q-DAY COUNTDOWN</p>
+                    <p className="font-mono text-xs tracking-[0.24em] text-gray-500">READINESS PROJECTION</p>
                     {qDay && countdown ? (
                       <>
                         <ProvenanceLegend
@@ -1788,12 +1864,14 @@ export default function QuantumThreatTerminal() {
                           <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.years}</div>
                           <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.days}</div>
                         </div>
-                        <p className="mt-6 font-mono text-sm text-gray-500">
-                          Forecast model: years = ln(required LQ / current frontier eLQ) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
-                        </p>
-                        <p className="mt-3 font-mono text-sm text-gray-500">
-                          Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
-                        </p>
+                        <CollapsibleTechnicalDetails title="READINESS MODEL FORMULAS & ASSUMPTIONS" className="mt-6">
+                          <p className="font-mono text-sm text-gray-500">
+                            Forecast model: years = ln(required readiness threshold / current frontier proxy) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
+                          </p>
+                          <p className="font-mono text-sm text-gray-500">
+                            Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
+                          </p>
+                        </CollapsibleTechnicalDetails>
                         <div className="mt-6 grid gap-3 md:grid-cols-3">
                           <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
                             <div className="flex items-center justify-between gap-3">
@@ -1831,15 +1909,17 @@ export default function QuantumThreatTerminal() {
                           <p className="mt-8 font-mono text-sm text-gray-400">
                             Last successful sync: {qDay.lastSuccessfulSyncLabel} | Methodology: {qDay.methodologyVersion}
                           </p>
-                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                            Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
-                          </p>
-                          <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                            Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
-                          </p>
-                          <p className="mt-3 max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
-                            {qDay.methodologyNote}
-                          </p>
+                          <CollapsibleTechnicalDetails title="READINESS METHODOLOGY NOTES" className="mt-3">
+                            <p className="font-mono text-xs leading-relaxed text-gray-500">
+                              Source frontier: {qDay.currentLeaderSourceLabel} | Basis: {qDay.leaderMetricBasis}
+                            </p>
+                            <p className="font-mono text-xs leading-relaxed text-gray-500">
+                              Display class: modeled countdown derived from direct benchmark inputs and normalized frontier scores. It is not a direct measured breach-date signal.
+                            </p>
+                            <p className="max-w-4xl font-mono text-xs leading-relaxed text-gray-500">
+                              {qDay.methodologyNote}
+                            </p>
+                          </CollapsibleTechnicalDetails>
                           {globalMetricsError ? (
                             <p className="mt-3 text-sm text-red-300">Top metrics unavailable: {globalMetricsError}</p>
                           ) : null}
@@ -1865,13 +1945,13 @@ export default function QuantumThreatTerminal() {
                 ) : (
                   <>
                     <p className="inline-block bg-cyan-400/20 px-2 py-1 font-mono text-xs font-bold tracking-[0.24em] text-cyan-300">
-                      THE RSA-2048 DELTA
+                      CRYPTOGRAPHIC RISK GAP (MODELLED)
                     </p>
                     <ProvenanceLegend
                       className="mt-5"
                       items={[
                         { label: 'MODELLED ESTIMATE', kind: 'modeled' },
-                        { label: 'DIRECT AQ FRONTIER INPUT', kind: 'direct' },
+                        { label: 'DIRECT BENCHMARK-FAMILY INPUT', kind: 'direct' },
                       ]}
                     />
                     <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -1887,9 +1967,11 @@ export default function QuantumThreatTerminal() {
                     <p className="mt-8 font-mono text-sm text-gray-400">
                       REQUIRED: {formatIntegerMetric(qDay?.requiredLogicalQubits ?? null)} LQ | STATUS: {(qDay?.statusPercent ?? 0).toFixed(2)}%
                     </p>
-                    <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                      Modeled eLQ proxy based on curated Metriq AQ, quality, scale, and error-correction signals. This is not a direct published logical-qubit count.
-                    </p>
+                    <CollapsibleTechnicalDetails title="CRYPTOGRAPHIC RISK TECHNICAL NOTE" className="mt-3">
+                      <p className="font-mono text-xs leading-relaxed text-gray-500">
+                        Modeled readiness proxy based on curated benchmark-family quality, scale, throughput, and error-correction signals. This is not a direct published logical-qubit count.
+                      </p>
+                    </CollapsibleTechnicalDetails>
                     <div className="mt-4 h-3 overflow-hidden rounded-full border border-cyan-700 bg-black/70">
                       <div
                         className="h-full bg-gradient-to-r from-cyan-500 to-cyan-300"
@@ -1957,12 +2039,14 @@ export default function QuantumThreatTerminal() {
                         </div>
                       ))}
                     </div>
-                    <p className="mt-5 font-mono text-xs leading-relaxed text-gray-500">
-                      Methodology: {riskAssessment.methodologyVersion}. {riskAssessment.methodologyNote}
-                    </p>
-                    <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
-                      Axis values are normalized frontier scores, not raw lab units. Status badges indicate whether each axis is based on direct benchmark coverage, partially modelled coverage, or unavailable evidence.
-                    </p>
+                    <CollapsibleTechnicalDetails title="THREAT MATRIX METHODOLOGY" className="mt-5">
+                      <p className="font-mono text-xs leading-relaxed text-gray-500">
+                        Methodology: {riskAssessment.methodologyVersion}. {riskAssessment.methodologyNote}
+                      </p>
+                      <p className="font-mono text-xs leading-relaxed text-gray-500">
+                        Axis values are normalized frontier scores, not raw lab units. Status badges indicate whether each axis is based on direct benchmark coverage, partially modelled coverage, or unavailable evidence.
+                      </p>
+                    </CollapsibleTechnicalDetails>
                   </>
                 ) : (
                   <TerminalWarning
@@ -2030,12 +2114,19 @@ export default function QuantumThreatTerminal() {
                           style={{ width: `${riskAssessment.hndlPressure}%` }}
                         />
                       </div>
-                      <p className="mt-3 text-sm leading-relaxed text-amber-100/80">
-                        HNDL is a modelled exposure-pressure index: vulnerable encrypted share x quantum cryptanalytic readiness. It is not direct byte-volume telemetry.
-                      </p>
-                      <p className="mt-2 font-mono text-xs leading-relaxed text-amber-100/70">
-                        Harvestable share is a methodology input. Cryptanalytic readiness is derived from normalized benchmark axes published by the backend.
-                      </p>
+                      <details className="mt-3 rounded-xl border border-amber-900 bg-black/35 p-4">
+                        <summary className="cursor-pointer list-none font-mono text-xs tracking-[0.16em] text-amber-300">
+                          HNDL FORMULA & INTERPRETATION
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm leading-relaxed text-amber-100/80">
+                            HNDL is a modelled exposure-pressure index: vulnerable encrypted share x quantum cryptanalytic readiness. It is not direct byte-volume telemetry.
+                          </p>
+                          <p className="font-mono text-xs leading-relaxed text-amber-100/70">
+                            Harvestable share is a methodology input. Cryptanalytic readiness is derived from normalized benchmark axes published by the backend.
+                          </p>
+                        </div>
+                      </details>
                     </div>
 
                     <div>
@@ -2073,14 +2164,19 @@ export default function QuantumThreatTerminal() {
                       })}
                     </div>
 
-                    <div className="rounded-xl border border-amber-800 bg-black/55 p-5">
-                      <p className="font-mono text-lg leading-relaxed text-amber-200">
-                        Last successful sync: {riskAssessment.lastSuccessfulSyncLabel}. Methodology: {riskAssessment.methodologyVersion}.
-                      </p>
-                      <p className="mt-3 text-sm leading-relaxed text-amber-100/80">
-                        {riskAssessment.methodologyNote}
-                      </p>
-                    </div>
+                    <details className="rounded-xl border border-amber-800 bg-black/55 p-5">
+                      <summary className="cursor-pointer list-none font-mono text-sm tracking-[0.16em] text-amber-200">
+                        HNDL METHOD DETAILS
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <p className="font-mono text-lg leading-relaxed text-amber-200">
+                          Last successful sync: {riskAssessment.lastSuccessfulSyncLabel}. Methodology: {riskAssessment.methodologyVersion}.
+                        </p>
+                        <p className="text-sm leading-relaxed text-amber-100/80">
+                          {riskAssessment.methodologyNote}
+                        </p>
+                      </div>
+                    </details>
                   </>
                 ) : (
                   <TerminalWarning
@@ -2097,10 +2193,10 @@ export default function QuantumThreatTerminal() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-cyan-300">
                   <Database className="h-5 w-5" />
-                  FRONTIER EVIDENCE
+                  BENCHMARK EVIDENCE
                 </CardTitle>
                 <CardDescription className="text-gray-500">
-                  Admitted production-safe benchmark signals currently feeding the core frontier, Q-Day, and HNDL outputs.
+                  Admitted benchmark-family evidence currently feeding readiness projection, threat modeling, and HNDL outputs.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2283,9 +2379,50 @@ export default function QuantumThreatTerminal() {
                 </form>
               </CardContent>
             </Card>
+
+            <Card className="border-cyan-900 bg-black/40">
+              <CardHeader>
+                <CardTitle className="text-cyan-300">Quantum Threat Intelligence Guide (SEO / GEO / AEO)</CardTitle>
+                <CardDescription className="text-gray-500">
+                  Keyword-targeted primer for search engines, answer engines, and AI retrieval systems.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <p className="text-sm leading-7 text-gray-300">
+                  XQBTS is a quantum threat intelligence platform focused on benchmark evidence, Q-Day readiness projection, post-quantum cryptography migration context, and modeled HNDL risk pressure. Teams evaluating quantum risk and quantum-safe transition planning can use the terminal as a live reference surface.
+                </p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {SEO_KEYWORD_CLUSTERS.map((cluster) => (
+                    <div key={cluster.heading} className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
+                      <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">{cluster.heading}</p>
+                      <ul className="mt-3 space-y-2 text-sm text-gray-300">
+                        {cluster.keywords.map((keyword) => (
+                          <li key={keyword}>• {keyword}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-5">
+                  <p className="font-mono text-[11px] tracking-[0.18em] text-cyan-300">AEO FAQ</p>
+                  <div className="mt-4 space-y-3">
+                    {SEO_FAQ_ITEMS.map((item) => (
+                      <details key={item.question} className="rounded-lg border border-cyan-950/80 bg-black/35 p-3">
+                        <summary className="cursor-pointer font-mono text-xs tracking-[0.08em] text-cyan-200">{item.question}</summary>
+                        <p className="mt-2 text-sm leading-7 text-gray-300">{item.answer}</p>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
       </div>
 
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData) }}
+      />
       <AuditModal row={selectedAuditRow} onClose={() => setSelectedAuditRow(null)} />
     </div>
   );

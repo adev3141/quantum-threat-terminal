@@ -2,6 +2,7 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Legacy public terminal documents (kept readable for compatibility during migration).
     match /global/metrics {
       allow read: if true;
       allow write: if false;
@@ -23,6 +24,27 @@ service cloud.firestore {
     }
 
     match /global/risk_signals {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Benchmark-native public terminal documents.
+    match /global/benchmark_frontier {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/readiness_projection {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/threat_signals {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global/benchmark_methodology {
       allow read: if true;
       allow write: if false;
     }
@@ -75,6 +97,27 @@ service cloud.firestore {
     }
 
     match /global_risk_signals_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Benchmark-native history collections.
+    match /global_benchmark_frontier_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_readiness_projection_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_threat_signals_history/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_benchmark_methodology_history/{document} {
       allow read: if true;
       allow write: if false;
     }
