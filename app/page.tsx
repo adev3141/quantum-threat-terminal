@@ -1864,14 +1864,12 @@ export default function QuantumThreatTerminal() {
                           <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.years}</div>
                           <div className="font-mono text-7xl font-bold text-cyan-300">{countdown.days}</div>
                         </div>
-                        <CollapsibleTechnicalDetails title="READINESS MODEL FORMULAS & ASSUMPTIONS" className="mt-6">
-                          <p className="font-mono text-sm text-gray-500">
-                            Forecast model: years = ln(required readiness threshold / current frontier proxy) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
-                          </p>
-                          <p className="font-mono text-sm text-gray-500">
-                            Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
-                          </p>
-                        </CollapsibleTechnicalDetails>
+                        <p className="mt-6 font-mono text-sm text-gray-500">
+                          Forecast model: years = ln(required readiness threshold / current frontier proxy) / ln(growth factor). Central growth factor: {qDay.annualGrowthFactorCentral.toFixed(1)}. Target runtime: RSA-2048 factorization in {qDay.targetRuntimeHours}h.
+                        </p>
+                        <p className="mt-3 font-mono text-sm text-gray-500">
+                          Range: {qDay.earliestYearsToQDay.toFixed(1)}y-{qDay.latestYearsToQDay.toFixed(1)}y | Central year: {Math.round(qDay.qDayYearCentral)} | Growth assumptions: {qDay.annualGrowthFactorLow.toFixed(1)}x / {qDay.annualGrowthFactorCentral.toFixed(1)}x / {qDay.annualGrowthFactorHigh.toFixed(1)}x per year.
+                        </p>
                         <div className="mt-6 grid gap-3 md:grid-cols-3">
                           <div className="rounded-xl border border-cyan-950 bg-cyan-950/10 p-4">
                             <div className="flex items-center justify-between gap-3">
@@ -1967,11 +1965,9 @@ export default function QuantumThreatTerminal() {
                     <p className="mt-8 font-mono text-sm text-gray-400">
                       REQUIRED: {formatIntegerMetric(qDay?.requiredLogicalQubits ?? null)} LQ | STATUS: {(qDay?.statusPercent ?? 0).toFixed(2)}%
                     </p>
-                    <CollapsibleTechnicalDetails title="CRYPTOGRAPHIC RISK TECHNICAL NOTE" className="mt-3">
-                      <p className="font-mono text-xs leading-relaxed text-gray-500">
-                        Modeled readiness proxy based on curated benchmark-family quality, scale, throughput, and error-correction signals. This is not a direct published logical-qubit count.
-                      </p>
-                    </CollapsibleTechnicalDetails>
+                    <p className="mt-3 font-mono text-xs leading-relaxed text-gray-500">
+                      Modeled readiness proxy based on curated benchmark-family quality, scale, throughput, and error-correction signals. This is not a direct published logical-qubit count.
+                    </p>
                     <div className="mt-4 h-3 overflow-hidden rounded-full border border-cyan-700 bg-black/70">
                       <div
                         className="h-full bg-gradient-to-r from-cyan-500 to-cyan-300"

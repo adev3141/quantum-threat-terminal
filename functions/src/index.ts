@@ -2303,8 +2303,7 @@ function selectBestBenchmarkResult(
       if (metricValue === null) {
         continue;
       }
-      if (!metricMatchesTask(metricName, benchmarkName, config) &&
-        !matchesRelaxedTaskMetric(config.key, metricName, benchmarkName)) {
+      if (!metricMatchesTask(metricName, benchmarkName, config)) {
         continue;
       }
       const evaluatedAtMs = parseDateMs(row.timestamp);
@@ -2368,12 +2367,7 @@ async function fetchPlatformsIndex(): Promise<MetriqPlatformIndexEntry[]> {
     return payload.filter((row): row is MetriqPlatformIndexEntry => Boolean(row && typeof row === "object"));
   }
   if (payload && typeof payload === "object") {
-    const wrappedRows = firstDefinedRecordArray(payload as Record<string, unknown>, [
-      "platforms",
-      "rows",
-      "data.rows",
-      "data.platforms",
-    ]);
+    const wrappedRows = firstDefinedRecordArray(payload as Record<string, unknown>, ["platforms", "data", "rows"]);
     return wrappedRows;
   }
   return [];
@@ -2381,24 +2375,12 @@ async function fetchPlatformsIndex(): Promise<MetriqPlatformIndexEntry[]> {
 
 function firstDefinedRecordArray(record: Record<string, unknown>, keys: string[]): MetriqPlatformIndexEntry[] {
   for (const key of keys) {
-    const value = getNestedValue(record, key);
+    const value = record[key];
     if (Array.isArray(value)) {
       return value.filter((entry): entry is MetriqPlatformIndexEntry => Boolean(entry && typeof entry === "object"));
     }
   }
   return [];
-}
-
-function getNestedValue(record: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = record;
-  for (const part of parts) {
-    if (!current || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
 }
 
 function selectPhysicalQubitsCandidate(
@@ -2419,29 +2401,13 @@ function selectPhysicalQubitsCandidate(
     }
 
     const current = entry.current && typeof entry.current === "object" ? entry.current : {};
-    const deviceMetadata =
-      (current as Record<string, unknown>).device_metadata &&
-      typeof (current as Record<string, unknown>).device_metadata === "object" ?
-        ((current as Record<string, unknown>).device_metadata as Record<string, unknown>) :
-        {};
     const metricValue =
       parseMetricNumberFromUnknown((current as Record<string, unknown>).qubits) ??
       parseMetricNumberFromUnknown((current as Record<string, unknown>).num_qubits) ??
-      parseMetricNumberFromUnknown((current as Record<string, unknown>).physical_qubits) ??
-      parseMetricNumberFromUnknown((current as Record<string, unknown>).numQubits) ??
-      parseMetricNumberFromUnknown((current as Record<string, unknown>).n_qubits) ??
-      parseMetricNumberFromUnknown((deviceMetadata as Record<string, unknown>).qubits) ??
-      parseMetricNumberFromUnknown((deviceMetadata as Record<string, unknown>).num_qubits) ??
-      parseMetricNumberFromUnknown((deviceMetadata as Record<string, unknown>).numQubits) ??
-      parseMetricNumberFromUnknown((deviceMetadata as Record<string, unknown>).n_qubits);
+      parseMetricNumberFromUnknown((current as Record<string, unknown>).physical_qubits);
     if (metricValue === null) {
       return [];
     }
-    const evaluatedAtMs =
-      parseDateMs((current as Record<string, unknown>).timestamp) ??
-      parseDateMs((entry as Record<string, unknown>).timestamp) ??
-      parseDateMs((deviceMetadata as Record<string, unknown>).timestamp) ??
-      0;
     const isAttributed = provider !== "unknown-provider" && device !== "unknown-device";
     const attributionStatus: FrontierAttributionStatus = isAttributed ? "direct" : "provider-only";
     if (config.requirePlatformAttribution && !isAttributed) {
@@ -2451,7 +2417,7 @@ function selectPhysicalQubitsCandidate(
       metricName: "physical_qubits",
       metricValue,
       sourceLabel: `${provider} / ${device}`,
-      evaluatedAtMs,
+      evaluatedAtMs: Date.now(),
       rawSnapshot: sanitizeRecord(entry),
       attributionStatus,
       platformId: isAttributed ? `${provider}:${device}` : null,
@@ -2496,7 +2462,7 @@ function synthesizeAqSignalFromCoverage(
     frontierSignals.readoutFidelity?.normalizedScore,
     frontierSignals.logicalErrorRate?.normalizedScore,
   ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  if (usable.length < 1) {
+  if (usable.length < 3) {
     return null;
   }
   const normalizedProxy = clampPercent(usable.reduce((sum, value) => sum + value, 0) / usable.length);
@@ -3026,44 +2992,6 @@ function adjustMetricValueForTask(config: MetriqTaskConfig, metricName: string, 
     }
   }
   return value;
-}
-
-function matchesRelaxedTaskMetric(taskKey: MetriqTaskKey, metricName: string, benchmarkName: string): boolean {
-  const metric = normalizeComparableText(metricName);
-  const benchmark = normalizeComparableText(benchmarkName);
-  switch (taskKey) {
-  case "physicalQubits":
-    return metric.includes("qubit") || metric.includes("num") || metric.includes("count");
-  case "singleQubitGateSpeed":
-  case "twoQubitGateSpeed":
-    return metric.includes("clops") ||
-      metric.includes("time") ||
-      metric.includes("latency") ||
-      benchmark.includes("clops");
-  case "twoQubitFidelity":
-    return metric.includes("fidelity") || metric.includes("success") || metric.includes("polarization");
-  case "logicalErrorRate":
-  case "faultTolerantQecLogicalErrorRate":
-    return metric.includes("error") || metric.includes("fidelity") || benchmark.includes("eplg");
-  case "quantumVolume":
-    return metric.includes("volume") || metric.includes("score") || benchmark.includes("bseq") || benchmark.includes("wit");
-  case "coherenceT2":
-    return metric.includes("t2") || metric.includes("coherence");
-  case "readoutFidelity":
-    return metric.includes("readout") || metric.includes("measurement") || metric.includes("success");
-  case "surfaceCode":
-    return metric.includes("distance") || metric.includes("code") || metric.includes("threshold");
-  case "qecDecoding":
-    return metric.includes("decode") || metric.includes("latency") || metric.includes("time") || metric.includes("score");
-  case "shorOrderFinding":
-    return metric.includes("order") || metric.includes("fidelity") || metric.includes("success") || metric.includes("score");
-  case "integerFactoring":
-    return metric.includes("factor") || metric.includes("success") || metric.includes("score");
-  case "aq":
-    return metric.includes("score") || metric.includes("accuracy") || metric.includes("fidelity");
-  default:
-    return false;
-  }
 }
 
 function looksTheoreticalRecord(value: string): boolean {
